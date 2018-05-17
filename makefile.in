@@ -1,0 +1,34 @@
+debug/%-pic$(OBJ): %.cpp
+	$(CC) $(WALL) $(SO_CFLAGS) $(CFLAGS_DEBUG) -Isrc -I$(PREFIX)include -o$@ -c  $<
+
+optimized/%-pic$(OBJ): %.cpp
+	$(CC) $(WALL) $(SO_CFLAGS) $(CFLAGS_OPTIMIZE) -Isrc -I$(PREFIX)include -o$@ -c  $<
+
+debug/%$(OBJ): %.cpp
+	$(CC) $(WALL) $(CFLAGS) $(CFLAGS_DEBUG) -Isrc -I$(PREFIX)include -o$@ -c  $<
+
+optimized/%$(OBJ): %.cpp
+	$(CC) $(WALL) $(CFLAGS) $(CFLAGS_OPTIMIZE) -Isrc -I$(PREFIX)include -o$@ -c $<
+
+optimized/%-pie$(OBJ): %.cpp
+	$(CC) $(WALL) $(PIE_CFLAGS) $(CFLAGS_OPTIMIZE) -Isrc -I$(PREFIX)include -o$@ -c $<
+
+debug/%$(EXE): debug/%$(OBJ)
+	$(CC) $(WALL) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_DEBUG) $(OUTPUT_OPTION) $(ALLDEPS) -L$(PREFIX)debug/lib -L$(PREFIX)lib $(EXTRALIBS)
+
+optimized/%$(EXE): optimized/%$(OBJ)
+	$(CC) $(WALL) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_OPTIMIZE) $(OUTPUT_OPTION) $(ALLDEPS) -L$(PREFIX)lib $(EXTRALIBS)
+
+optimized/%-static$(EXE): optimized/%$(OBJ)
+	$(CC) -static $(WALL) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_OPTIMIZE) $(OUTPUT_OPTION) $(ALLDEPS) -L$(PREFIX)lib $(EXTRALIBS)
+
+
+debug/%-pic$(EXE): debug/%-pic$(OBJ)
+	$(CC) $(WALL) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_DEBUG) $(OUTPUT_OPTION) $(ALLDEPS) -L$(PREFIX)debug/lib -L$(PREFIX)lib $(EXTRALIBS)
+
+optimized/%-pie$(EXE): optimized/%-pie$(OBJ)
+	$(CC) $(WALL) $(PIE_CFLAGS) $(PIE_LDFLAGS) $(LDFLAGS_OPTIMIZE) $(OUTPUT_OPTION) $(ALLDEPS) -L$(PREFIX)lib $(EXTRALIBS)
+
+optimized/%-s$(EXE): optimized/%$(OBJ)
+	$(CC) $(WALL) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_OPTIMIZE) $(OUTPUT_OPTION) $(ALLDEPS) -L$(PREFIX)lib $(EXTRALIBS) $(PKGCONFLIBS)
+
