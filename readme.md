@@ -13,12 +13,12 @@ called xxx.cpp. Note that we talk about translation units in the sense of the C+
 standard. Each translation unit may contain many classes. See the file *mkdeps*.md for
 details.
 
-For the purposes of **mkdeps** you can use several directories to distribute the source
+For the purposes of *mkdeps* you can use several directories to distribute the source
 files and you can specify the include directories. So if you wish you can have some of
 the include files in an include directory and some of the source files in another
 directory.
 
-Letting **mkdeps** figure out which files are needed for each target simplifies the
+Letting *mkdeps* figure out which files are needed for each target simplifies the
 maintenance of the makefile. You must only define the pattern rules that compile each
 kind of source. The maintenance of the dependencies is done automatically by *mkdeps*.
 
