@@ -1,0 +1,66 @@
+echo "compiling test driver..."
+rm pelconf pelconf.o pelconf.obj pelconf.exe 2>__autokk
+
+for i in $*; do
+	case $i in
+		--cc=*|cc=*|--CC=*|CC=*)
+			mycc=`echo $i | cut -d '=' -f2`
+			break
+		;;
+	esac
+done
+
+
+if test "$mycc" != "" -a "prog$CC" != prog ; then
+	mycc=$CC
+fi
+
+
+if test "$mycc" != ""; then
+	echo compiling with $mycc
+	rm pelconf pelconf.exe 2>__autokk
+	if $mycc pelconf.c 2>__autokk
+	then
+		if test ! -f pelconf -a ! -f pelconf.exe
+		then
+			if $mycc -o pelconf pelconf.c 2>__autokk
+			then
+				if test ! -f pelconf -a ! -f pelconf.exe
+				then
+					$mycc -epelconf.exe pelconf.c
+				fi
+			fi
+		fi
+	fi
+elif test prog$MAKE != prog
+then
+	echo "# Empty file.">__autocf.mk
+	echo compiling with $MAKE
+	$MAKE -f__autocf.mk pelconf >__autokk 2>__autokk2
+else
+	echo "# Empty file.">__autocf.mk
+	echo compiling with make
+	make -f__autocf.mk pelconf >__autokk 2>__autokk2
+fi
+
+if test ! -f pelconf -a ! -f pelconf.exe; then
+	cc -o pelconf pelconf.c 2>foo
+fi
+
+if test ! -f pelconf -a ! -f pelconf.exe; then
+	gcc -o pelconf pelconf.c
+fi
+
+
+if test -f pelconf -o -f pelconf.exe; then
+	./pelconf "$@"
+else
+	echo Cannot compile the test driver pelconf.c
+	echo Please compile pelconf.c and run it as it if were configure.
+fi
+
+rm __autocf.* __autokk2 2>__autokk
+rm __autokk
+rm __autotst*
+rm __dummy*
+
