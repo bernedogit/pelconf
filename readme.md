@@ -36,3 +36,17 @@ program there is no difference from autoconf. You just run the commands ./config
 make; make install. For the creator of the program *pelconf* is much easier due to the
 use of C to specify the tests. See *pelconflib.md* for details.
 
+To install *mkdeps* just compile the source file `mkdeps.cpp`. For instance:
+
+	g++ -Wall -std=gnu++11 -O2 -o mkdeps mkdeps.cpp
+	sudo mv mkdeps /usr/local/bin
+
+To use *pelconf* you first write the `pelconf.c` file with the list of tests that you
+wish to run. You also write the `makefile.in` file. You copy the `pelconflib.c`,
+`configure` and `configure.bat` files to the set of files that will be distributed.
+When the user configures the program the only thin needed is to run `./configure`.
+This will compile pelconf.c and pelconflib.c and run the resulting program. The
+configuration program will create the file `config.h`. It will also create `makefile`
+by writing makefile variable assignments and then copying the contents of
+`makefile.in`.
+
