@@ -76,6 +76,7 @@ static const char *aci_attrib_pfx = "GCCA_";
 
 static char aci_make_exe_prefix[100];
 static char aci_install_prefix[FILENAME_MAX] = "";
+static int aci_install_prefix_spaces = 0;
 
 
 /* Which compiler are we using? */
@@ -1170,8 +1171,12 @@ static void aci_add_cflags (sbuf_t *sb, const char *flags)
 	sbufcat (sb, sbufchars (&aci_extra_cflags));
 	sbufcat (sb, sbufchars (&aci_testing_flags));
 
-	sbufformat (sb, 0, " -I%sinclude -L%slib ", aci_install_prefix,
-	        aci_install_prefix);
+	if (aci_install_prefix_spaces) {
+		sbufformat (sb, 0, " -I\"%sinclude\" -L\"%slib\" ", aci_install_prefix,
+		            aci_install_prefix);
+	} else {
+		sbufformat (sb, 0, " -I%sinclude -L%slib ", aci_install_prefix, aci_install_prefix);
+	} 
 
 	if (flags != NULL) {
 		sow = flags;
@@ -1301,7 +1306,7 @@ static int aci_can_compile (const char *src, const char *cflags)
 
 	sbufinit (&sb);
 
-	sbufcpy (&sb, aci_test_file);
+	sbufcpy (&sb, aci_test_file);                    
 	sbufcat (&sb, aci_source_extension);
 
 	f = fopen (sbufchars(&sb), "w");
@@ -5105,15 +5110,17 @@ static int aci_locate_woe_compiler(const char *cmd, char *fullpath, size_t n)
 	const char *path;
 	int result = -1;
 	FILE *fr;
+	ptrdiff_t cmlen;
 	char cmdword[FILENAME_MAX];
 
 	sbufinit(&sb);
 
 	/* Locate end of the first part of the command */
 	for (cmdeow = cmd; *cmdeow && *cmdeow != ' '; ++cmdeow) ;
-	memcpy (cmdword, cmd, cmdeow - cmd);
-	cmdword[cmdeow - cmd] = 0;
-	if (strcmp(cmdword + (cmdeow - cmd) - 4, ".exe") != 0) {
+	cmlen = cmdeow - cmd;
+	memcpy (cmdword, cmd, cmlen);
+	cmdword[cmlen] = 0;
+	if (cmlen < 4 || strcmp(cmdword + cmlen - 4, ".exe") != 0) {
 		strcat (cmdword, ".exe");
 	}
 
@@ -5155,25 +5162,25 @@ static int aci_locate_woe_compiler(const char *cmd, char *fullpath, size_t n)
 			fr = fopen (sbufchars(&sb), "rb");
 			if (fr) {
 				fclose (fr);
+				char *wp;
 				sbuftrunc(&sb, prefix_length);
-				if (strcmp("bin/", sbufchars(&sb) + prefix_length - 4) == 0) {
-					char *wp;
+				if (prefix_length > 4 && strcmp("bin/", sbufchars(&sb) + prefix_length - 4) == 0) {
 					prefix_length -= 4;
-
-					if (n > prefix_length + 1) {
-						n = prefix_length + 1;
-					}
-					for (wp = sbufchars(&sb); *wp; ++wp) {
-						if (*wp == '\\') {
-							*wp = '/';
-						}
-					}
-					memcpy (fullpath, sbufchars(&sb), n);
-					fullpath[n - 1] = 0;
-
-					result = 0;
-					break;
 				}
+
+				if (n > prefix_length + 1) {
+					n = prefix_length + 1;
+				}
+				for (wp = sbufchars(&sb); *wp; ++wp) {
+					if (*wp == '\\') {
+						*wp = '/';
+					}
+				}
+				memcpy (fullpath, sbufchars(&sb), n);
+				fullpath[n - 1] = 0;
+
+				result = 0;
+				break;
 			}
 
 			sow = eow;
@@ -5217,6 +5224,9 @@ static void aci_get_prefix(void)
 	} else {
 		ac_set_var ("PREFIX", "/usr/local/");
 		strcpy (aci_install_prefix, "/usr/local/");
+	}
+	if (strchr (aci_install_prefix, ' ') != NULL) {
+		aci_install_prefix_spaces = 1;
 	}
 }
 
@@ -5270,9 +5280,13 @@ static void aci_check_gcc_flags (int prefer_cxx)
 	ac_check_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
 	ac_check_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
 	ac_check_compiler_flag ("-ffast-math", "GCC_FASTMATH");
-	ac_check_compiler_flag ("-g", "GCC_G");
+	ac_check_compiler_flag ("-ggdb", "GCC_G") || ac_check_compiler_flag ("-g", "GCC_G");
 	ac_check_compiler_flag ("-fstack-protector", "GCC_STACK_PROTECTOR");
 	ac_check_compiler_flag ("-fstack-protector-all", "GCC_STACK_PROTECTOR_ALL");
+	ac_check_compiler_flag ("-fsanitize=address", "GCC_SANITIZE_ADDRESS");
+	ac_check_compiler_flag ("-fsanitize=leak", "GCC_SANITIZE_LEAK");
+	ac_check_compiler_flag ("-fsanitize=thread", "GCC_SANITIZE_THREAD");
+
 	// Does not work in Cygwin yet.
 	if (!aci_have_woe32) {
 		ac_check_compiler_flag ("-gsplit-dwarf", "GCC_SPLIT_DWARF");
@@ -5971,7 +5985,11 @@ void ac_create_pc_file (const char *libname, const char *desc)
 	aci_varnode_dump ("EXTRA_CFLAGS", f);
 //  aci_varnode_dump ("GCC_STD", f);
 	fprintf (f, "\n");
-	fprintf (f, "Libs: -L%slib -l%s\n", aci_install_prefix, libname);
+	if (aci_install_prefix_spaces) {
+		fprintf (f, "Libs: -L\"%slib\" -l%s\n", aci_install_prefix, libname);
+	} else {
+		fprintf (f, "Libs: -L%slib -l%s\n", aci_install_prefix, libname);
+	}
 
 	fprintf (f, "Requires.private: ");
 	aci_dump_strlist (&aci_pkg_config_packs, f, 0);

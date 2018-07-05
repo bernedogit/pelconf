@@ -303,10 +303,10 @@ class State {
 	Target_type      target;
 	String_set_type  already_seen;
 
-	void process_line (std::istream &is, const char *line);
+	void process_line (std::istream &is, const char *line, const char *parent);
 	void process_include (const char *name);
 	void process_ifdef (std::istream &is, const char *line, bool pos);
-	bool locate_file (const char *fn, std::string &expanded);
+	bool locate_file (const char *fn, std::string &expanded, const char *parent);
 public:
 	State () : target (Not_target) {}
 	void add_dependency (const std::string &def);
@@ -397,13 +397,17 @@ void State::scan_source_file (std::istream &is, const char *name)
 		std::cout << "scanning " << name << '\n';
 	}
 
+	shrink_to_dir (&ns);
+	if (ns.empty()) {
+		ns = ".";
+	}
 	while (!is.eof()) {
 		getline (is, sb);
 		i = sb.c_str ();
 		i = skip_space (i);
 
 		if (*i == '#') {
-			process_line (is, skip_space (i + 1));
+			process_line (is, skip_space (i + 1), ns.c_str());
 		} else if (strncmp (i, "int main", 8) == 0 ||
 		           strncmp (i, "main", 4) == 0) {
 			target = Main_target;
@@ -414,12 +418,12 @@ void State::scan_source_file (std::istream &is, const char *name)
 }
 
 
-void State::process_line (std::istream &is, const char *def)
+void State::process_line (std::istream &is, const char *def, const char *parent_dir)
 {
 	if (strncmp (def, "include", 7) == 0) {
 		const char *dep_name = skip_space (def + 7);
 		std::string expanded;
-		if (locate_file (dep_name, expanded)) {
+		if (locate_file (dep_name, expanded, parent_dir)) {
 			add_dependency (expanded);
 			process_include (expanded.c_str());
 		}
@@ -450,11 +454,27 @@ static std::string trim_spaces (std::string &s)
 }
 
 
-bool State::locate_file (const char *name, std::string &expanded)
+struct Dir_pusher {
+	bool active;
+	Dir_pusher() : active(false) {}
+	void push (const char *dir) {
+		active = true;
+		std::string dirs (dir);
+		search_dirs.push_front (dirs);
+	}
+	~Dir_pusher() {
+		if (active) {
+			search_dirs.pop_front();
+		}
+	}
+};
+
+bool State::locate_file (const char *name, std::string &expanded, const char *parent_dir)
 {
 	if (*name != '"' && *name != '<') {
 		return false;
 	}
+	bool local = *name == '"';
 
 	std::string stripped = name + 1;
 	if (stripped.empty()) {
@@ -467,8 +487,13 @@ bool State::locate_file (const char *name, std::string &expanded)
 	}
 
 	std::string cwd (gcwd);
- 
+
 	std::list<std::string>::iterator i, e;
+
+	Dir_pusher dp;
+	if (local) {
+		dp.push (parent_dir);
+	}
 
 	i = search_dirs.begin ();
 	e = search_dirs.end ();

@@ -166,9 +166,6 @@ int main (int argc, char **argv)
 				"int main() { new std::codecvt<wchar_t,char,mbstate_t>; }\n",
 				"", NULL, "CXX_CODECVT_WC");
 
-	ac_check_func_pkg_config ("peltk/ucs/ucspp.hpp", NULL, "peltk::ucs::ucs_property", "peltk-ucs")
-	  || ac_msg_error ("I need the peltk-ucs library, but it could not be found.");
-
 
 	ac_config_out ("config.h", "PELTK_BASE");
 	ac_edit_makefile ("makefile.in", "makefile");
