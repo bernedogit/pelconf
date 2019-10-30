@@ -58,6 +58,10 @@ static int aci_have_cygwin = 0;
 /* Base name of the file used for test snippets. */
 static const char aci_test_file[] = "__autotst";
 
+/* Redirected stdout, stderr file names. */
+static const char aci_stdout_dummy[] = "__dummy1.txt";
+static const char aci_stderr_dummy[] = "__dummy2.txt";
+
 /* Prefix to be used for all the macros that we define. This
    is used for name spacing. */
 static const char *aci_macro_prefix = "";
@@ -119,24 +123,42 @@ static const char *aci_lib_suffix = "";
 
 
 
+/* Our OOM handler. Just abandon :-( */
+static void aci_out_of_memory (void)
+{
+	fprintf (stderr, "Sorry, the program run out of memory. Terminating...\n");
+	exit (EXIT_FAILURE);
+}
+
+
+/* Alloc or die */
+static void * aci_xmalloc (size_t sz)
+{
+	void *result = malloc (sz);
+	if (result == NULL) {
+		aci_out_of_memory ();
+	}
+	return result;
+}
+
+static void aci_strfree (char *s)
+{
+	free (s);
+}
 
 
 
 /* Variable length strings with buffer allocation. */
 
 
-/* If out of memory is detected, sbufbad will be set to true. */
 typedef struct sbuf_tag {
 	char *s;
 	size_t len, cap;
-	int bad;
 	char fixed[200];
 } sbuf_t;
 
 #define sbufchars(sb) ((sb)->s)
 #define sbuflen(sb) ((sb)->len)
-#define sbufbad(sb) ((sb)->bad)
-#define sbufvalid(sb) (!(sb)->bad)
 
 
 
@@ -172,7 +194,6 @@ void sbufinit (sbuf_t *sb)
 	sb->s = sb->fixed;
 	sb->len = 0;
 	sb->cap = sizeof (sb->fixed) - 1;
-	sb->bad = 0;
 	sb->s[0] = 0;
 }
 
@@ -185,7 +206,6 @@ void sbuffree (sbuf_t *sb)
 	}
 	sb->len = 0;
 	sb->s[0] = 0;
-	sb->bad = 0;
 }
 
 
@@ -197,7 +217,6 @@ char * sbufreserve (sbuf_t *sb, size_t n)
 	if (n > rsize_max) {
 		sb->s[0] = 0;
 		sb->len = 0;
-		sb->bad = 1;
 		return 0;
 	}
 
@@ -207,7 +226,8 @@ char * sbufreserve (sbuf_t *sb, size_t n)
 
 		buff = (char*) realloc (buff, new_cap + 1);
 		if (buff == NULL) {
-			return 0;
+			aci_out_of_memory();
+			return NULL;
 		}
 		if (sb->s == sb->fixed) {
 			memcpy (buff, sb->fixed, sb->len + 1);
@@ -216,7 +236,6 @@ char * sbufreserve (sbuf_t *sb, size_t n)
 		sb->cap = new_cap;
 		sb->s[new_cap] = 0;
 	}
-	sb->bad = 0;
 	return sb->s;
 }
 
@@ -238,13 +257,13 @@ static void sbufclear (sbuf_t *sb)
 	sb->s[0] = 0;
 }
 
-/* Append s to the string. May set the bad flag. */
+/* Append s to the string. */
 int sbufcat (sbuf_t *sb, const char *s)
 {
 	char *cp, *limit;
 	int must_copy;
 
-	if (sb->bad || s == NULL) {
+	if (s == NULL) {
 		return -1;
 	}
 
@@ -276,7 +295,7 @@ int sbufcat (sbuf_t *sb, const char *s)
 			} else {
 				sb->s[0] = 0;
 				sb->len = 0;
-				sb->bad = 1;
+				aci_out_of_memory();
 				return -1;
 			}
 		 }
@@ -293,14 +312,13 @@ int sbufncat (sbuf_t *sb, const char *s, size_t n)
 	const char *slimit;
 	int must_copy;
 
-	if (sb->bad || s == NULL) {
+	if (s == NULL) {
 		return -1;
 	}
 
 	if (n > rsize_max) {
 		sb->s[0] = 0;
 		sb->len = 0;
-		sb->bad = 0;
 		return -1;
 	}
 
@@ -338,7 +356,7 @@ int sbufncat (sbuf_t *sb, const char *s, size_t n)
 			} else {
 				sb->s[0] = 0;
 				sb->len = 0;
-				sb->bad = 1;
+				aci_out_of_memory();
 				return -1;
 			}
 		 }
@@ -350,7 +368,6 @@ int sbufncat (sbuf_t *sb, const char *s, size_t n)
 int sbufcpy (sbuf_t *sb, const char *s)
 {
 	sb->len = 0;
-	sb->bad = 0;
 	return sbufcat (sb, s);
 }
 
@@ -358,7 +375,6 @@ int sbufcpy (sbuf_t *sb, const char *s)
 int sbufncpy (sbuf_t *sb, const char *s, size_t n)
 {
 	sb->len = 0;
-	sb->bad = 0;
 	return sbufncat (sb, s, n);
 }
 
@@ -422,7 +438,6 @@ int sbufgets (sbuf_t *sb, FILE *f)
 		cp = sbufreserve (sb, sbuflen (sb) + chunk_size);
 		if (cp == 0) {
 			sbuftrunc (sb, 0);
-			sb->bad = 1;
 			return -1;
 		}
 		cp += sbuflen (sb);
@@ -508,24 +523,6 @@ static void aci_identcat (sbuf_t *sb, const char *s)
 
 
 
-/* Our OOM handler. Just abandon :-( */
-static void aci_out_of_memory (void)
-{
-	fprintf (stderr, "Sorry, the program run out of memory. Terminating...\n");
-	exit (EXIT_FAILURE);
-}
-
-
-/* Alloc or die */
-static void * aci_xmalloc (size_t sz)
-{
-	void *result = malloc (sz);
-	if (result == NULL) {
-		aci_out_of_memory ();
-	}
-	return result;
-}
-
 /* Make a copy of the string. */
 static char * aci_strsave (const char *s)
 {
@@ -536,10 +533,6 @@ static char * aci_strsave (const char *s)
 	return result;
 }
 
-static void aci_strfree (char *s)
-{
-	free (s);
-}
 
 
 /* A list of strings. */
@@ -1026,91 +1019,6 @@ static void aci_copy_to_log (void)
 }
 
 
-#if 0 // defined(__CYGWIN__) || defined(__MINGW__)
-
-// Woe is extremely slow compared to linux when it comes to launching
-// processes. We try to avoid calling bash.
-#include <process.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-static int aci_run_silent (const char *cmd)
-{
-	enum { avsz = 200 };
-	char        *av[avsz + 1], *news;
-	int         ac, i, rc = -1;
-	const char  *eow;
-	ptrdiff_t   slen;
-	int         saved1, saved2, out1, out2;
-	FILE        *conf;
-	const char  *scmd = cmd;
-
-	saved1 = saved2 = out1 = out2 = -1;
-
-	ac = 0;
-	while (*cmd) {
-		while (isspace(*cmd)) ++cmd;
-		eow = cmd;
-		while (*eow && !isspace(*eow)) ++eow;
-		if (ac >= avsz) goto cleanup;
-		slen = eow - cmd;
-		if (slen > 0) {
-			news = (char*) malloc (slen + 1);
-			if (news == NULL) goto cleanup;
-			memcpy (news, cmd, slen);
-			news[slen] = 0;
-			av[ac++] = news;
-		}
-		if (*eow) {
-			cmd = eow + 1;
-		} else {
-			cmd = eow;
-		}
-	}
-	av[ac] = NULL;
-
-	fflush (stdout);
-	fflush (stderr);
-
-	out1 = open ("__dummys1", O_CREAT|O_WRONLY, 0600);
-	out2 = open ("__dummys2", O_CREAT|O_WRONLY, 0600);
-	if (out1 < 0) {
-		printf ("open(__dummys1) failed\n");
-		goto cleanup;
-	}
-	if (out2 < 0) {
-		printf ("open(__dummys2) failed\n");
-		goto cleanup;
-	}
-
-	saved1 = dup(1);
-	if (saved1 < 0) {
-		printf ("dup(1) failed\n"); fflush (stdout);
-		goto cleanup;
-	}
-	saved2 = dup(2);
-	if (saved2 < 0) {
-		fprintf (stderr, "dup(2) failed\n");    fflush (stderr);
-		goto cleanup;
-	}
-	dup2 (out1, 1);
-	dup2 (out2, 2);
-
-
-	rc = spawnvp (_P_WAIT, av[0], av);
-
-cleanup:
-	for (i = 0; i < ac; ++i) {
-		free (av[i]);
-	}
-	close (out1);
-	close (out2);
-	dup2 (saved1, 1);
-	dup2 (saved2, 2);
-	return rc;
-}
-
-#else
 
 // Run a command with stdout and stderr redirected.
 static int aci_run_silent (const char *cmd)
@@ -1119,16 +1027,12 @@ static int aci_run_silent (const char *cmd)
 	int result;
 
 	sbufinit (&scmd);
-	sbufcpy (&scmd, cmd);
-	sbufcat (&scmd, " >__dummys1 2>__dummys2");
-
+	sbufformat (&scmd, 1, "%s >%s 2>%s", cmd, aci_stdout_dummy, aci_stderr_dummy);
 	result = system (sbufchars(&scmd));
 	sbuffree (&scmd);
 
 	return result;
 }
-
-#endif
 
 
 // Advance s to the first non space character.
@@ -1176,7 +1080,7 @@ static void aci_add_cflags (sbuf_t *sb, const char *flags)
 		            aci_install_prefix);
 	} else {
 		sbufformat (sb, 0, " -I%sinclude -L%slib ", aci_install_prefix, aci_install_prefix);
-	} 
+	}
 
 	if (flags != NULL) {
 		sow = flags;
@@ -1430,7 +1334,7 @@ static void aci_cat_cflags_cmt (sbuf_t *sb, const char *cflags)
 // with the flags "cflags". If successful add tag to the configuration tags
 // defined in config.h and add the cflags to the CFLAGS defined in the
 // makefile.
-int ac_check_headers_tag (const char *includes, const char *cflags, const char *tag)
+int ac_has_headers_tag (const char *includes, const char *cflags, const char *tag)
 {
 	int result;
 	sbuf_t comment;
@@ -1454,13 +1358,13 @@ int ac_check_headers_tag (const char *includes, const char *cflags, const char *
 
 // Same as above, but the tag will be automatically defined based on the
 // name of the included files.
-int ac_check_headers (const char *includes, const char *cflags)
+int ac_has_headers (const char *includes, const char *cflags)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, includes);
 
-	return ac_check_headers_tag (includes, cflags, tag);
+	return ac_has_headers_tag (includes, cflags, tag);
 }
 
 
@@ -1572,7 +1476,7 @@ static int aci_have_signature (const char *includes, const char *cflags,
 // Check if the function "func" is declared after including the files listed
 // in "includes" and compiling with the compilation flags "cflags". If the
 // function is declared then define the tag "tag" in the config.h file.
-int ac_check_proto_tag (const char *includes, const char *cflags,
+int ac_has_proto_tag (const char *includes, const char *cflags,
             const char *func, const char *tag)
 {
 	int result;
@@ -1599,13 +1503,13 @@ int ac_check_proto_tag (const char *includes, const char *cflags,
 
 // Same as above but the tag is automatically deduced from the name of the
 // function.
-int ac_check_proto (const char *includes, const char *cflags, const char *func)
+int ac_has_proto (const char *includes, const char *cflags, const char *func)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, func);
 
-	return ac_check_proto_tag (includes, cflags, func, tag);
+	return ac_has_proto_tag (includes, cflags, func, tag);
 }
 
 
@@ -1613,7 +1517,7 @@ int ac_check_proto (const char *includes, const char *cflags, const char *func)
 // "signature" after including the files listed in "includes" and compiling
 // with the compilation flags "cflags". If the function is declared then
 // define the tag "tag" in the config.h file.
-int ac_check_signature (const char *includes, const char *cflags,
+int ac_has_signature (const char *includes, const char *cflags,
         const char *func, const char *signature, const char *tag)
 {
 	int result;
@@ -1816,9 +1720,9 @@ static void aci_add_libs_to_makevars (const char *libs)
 // libs. If successful add the tag to the configuration file. "libs" is
 // interpreted as the names of the libraries. The function completes them to
 // turn something like foo into -lfoo or foo.lib as required.
-int ac_check_func_lib_tag (const char *includes, const char *cflags,
-                           const char *func, const char *libs,
-                           int verbatim, const char *tag)
+int ac_has_func_lib_tag (const char *includes, const char *cflags,
+                         const char *func, const char *libs,
+                         int verbatim, const char *tag)
 {
 	int result;
 	sbuf_t sb;
@@ -1853,7 +1757,7 @@ int ac_check_func_lib_tag (const char *includes, const char *cflags,
 
 
 
-int ac_check_func_lib_tag_cxx (const char *includes, const char *cflags,
+int ac_has_func_lib_tag_cxx (const char *includes, const char *cflags,
         const char *func, const char *libs, const char *tag)
 {
 	int result;
@@ -1885,31 +1789,31 @@ int ac_check_func_lib_tag_cxx (const char *includes, const char *cflags,
 
 
 
-int ac_check_func_lib (const char *includes, const char *cflags,
+int ac_has_func_lib (const char *includes, const char *cflags,
         const char *func, const char *libs)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, func);
 
-	return ac_check_func_lib_tag (includes, cflags, func, libs, 0, tag);
+	return ac_has_func_lib_tag (includes, cflags, func, libs, 0, tag);
 }
 
-int ac_check_func_lib_cxx (const char *includes, const char *cflags,
+int ac_has_func_lib_cxx (const char *includes, const char *cflags,
                            const char *func, const char *libs)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, func);
 
-	return ac_check_func_lib_tag_cxx (includes, cflags, func, libs, tag);
+	return ac_has_func_lib_tag_cxx (includes, cflags, func, libs, tag);
 }
 
 
 
-int ac_check_member_lib_tag (const char *includes, const char *cflags,
-                             const char *func, const char *libs,
-                             int verbatim, const char *tag)
+int ac_has_member_lib_tag (const char *includes, const char *cflags,
+                           const char *func, const char *libs,
+                           int verbatim, const char *tag)
 {
 	int result;
 	sbuf_t sb;
@@ -1943,15 +1847,15 @@ int ac_check_member_lib_tag (const char *includes, const char *cflags,
 }
 
 
-int ac_check_member_lib (const char *includes, const char *cflags,
-                         const char *func, const char *libs,
-                         int verbatim)
+int ac_has_member_lib (const char *includes, const char *cflags,
+                       const char *func, const char *libs,
+                       int verbatim)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, func);
 
-	return ac_check_member_lib_tag (includes, cflags, func, libs, verbatim, tag);
+	return ac_has_member_lib_tag (includes, cflags, func, libs, verbatim, tag);
 }
 
 
@@ -1984,7 +1888,7 @@ static int aci_have_field (const char *includes, const char *cflags,
 
 // If the given structure exits and has the field fname define the label to
 // 1. Otherwise undefine it.
-int ac_check_member_tag (const char *includes, const char *cflags,
+int ac_has_member_tag (const char *includes, const char *cflags,
         const char *sname, const char *fname, const char *tag)
 {
 	int result;
@@ -2011,7 +1915,7 @@ int ac_check_member_tag (const char *includes, const char *cflags,
 
 
 // Same as above but the tag is deduced from the name of the field.
-int ac_check_member (const char *includes, const char *cflags,
+int ac_has_member (const char *includes, const char *cflags,
         const char *sname, const char *fname)
 {
 	int result;
@@ -2022,7 +1926,7 @@ int ac_check_member (const char *includes, const char *cflags,
 	sbufformat (&sb, 1, "MEMBER_%s_IN_%s", fname, sname);
 	aci_make_identifier (sbufchars (&sb));
 
-	result = ac_check_member_tag (includes, cflags, sname, fname,
+	result = ac_has_member_tag (includes, cflags, sname, fname,
 	                                sbufchars (&sb));
 
 	sbuffree (&sb);
@@ -2057,7 +1961,7 @@ static int aci_have_typedef (const char *includes, const char *cflags,
 // files listed in "includes" and compiling with the compilation flags
 // "cflags". If "tname" is available then define tag in the configuration
 // file.
-int ac_check_type_tag (const char *includes, const char *cflags,
+int ac_has_type_tag (const char *includes, const char *cflags,
         const char *tname, const char *tag)
 {
 	int result;
@@ -2084,21 +1988,21 @@ int ac_check_type_tag (const char *includes, const char *cflags,
 
 
 // Same as above but the tag is deduced from the name of the type.
-int ac_check_type (const char *includes, const char *cflags, const char *tname)
+int ac_has_type (const char *includes, const char *cflags, const char *tname)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, tname);
 
-	return ac_check_type_tag (includes, cflags, tname, tag);
+	return ac_has_type_tag (includes, cflags, tname, tag);
 }
 
 
 // Check if we can compile the source code in "src", using the compilation
 // flags in "cflags". The comment "comment" will be put in the configuration
 // file before the definition of the tag "tag".
-int ac_check_compile (const char *comment, const char *src,
-                      const char *cflags, const char *tag)
+int ac_does_compile (const char *comment, const char *src,
+                     const char *cflags, const char *tag)
 {
 	int result;
 
@@ -2119,8 +2023,8 @@ int ac_check_compile (const char *comment, const char *src,
 // compilation flags in "cflags" and linking with the libraries in libs. The
 // comment "comment" will be put in the configuration file before the
 // definition of the tag "tag".
-int ac_check_link (const char *comment, const char *src,
-                   const char *flags, const char *libs, const char *tag)
+int ac_does_compile_and_link (const char *comment, const char *src,
+            const char *flags, const char *libs, const char *tag)
 {
 	int result = aci_can_compile_link (src, flags, libs, 0);
 
@@ -2128,6 +2032,7 @@ int ac_check_link (const char *comment, const char *src,
 
 	if (result) {
 		aci_add_cflags_to_makevars (flags);
+		aci_add_libs_to_makevars (libs);
 	}
 
 	printf ("%s: %s\n", comment, aci_noyes[result]);
@@ -2136,10 +2041,10 @@ int ac_check_link (const char *comment, const char *src,
 }
 
 
-// Same as ac_check_compile, but define the tag only if the compilation
+// Same as ac_does_compile, but define the tag only if the compilation
 // fails.
-int ac_check_compile_fail (const char *comment, const char *src,
-                const char *cflags, const char *tag)
+int ac_does_compile_fail (const char *comment, const char *src,
+            const char *cflags, const char *tag)
 {
 	int result;
 
@@ -2156,9 +2061,9 @@ int ac_check_compile_fail (const char *comment, const char *src,
 }
 
 
-// Same as ac_check_link, buf define the tag only if the compilation and
+// Same as ac_does_compile_and_link, buf define the tag only if the compilation and
 // linking fails.
-int ac_check_link_fail (const char *comment, const char *src,
+int ac_does_compile_and_link_fail (const char *comment, const char *src,
             const char *flags, const char *libs, const char *tag)
 {
 	int result = !aci_can_compile_link (src, flags, libs, 0);
@@ -2178,7 +2083,7 @@ int ac_check_link_fail (const char *comment, const char *src,
 
 
 // Check if the file "name" is available in the compilation environment.
-int ac_check_file (const char *name)
+int ac_has_file (const char *name)
 {
 	FILE *f = fopen (name, "rb");
 	if (f) {
@@ -2250,7 +2155,7 @@ int aci_check_sizeof (const char *includes, const char *cflags,
 
 // Public version of above. It will always put the result of the check in
 // the configuration file.
-int ac_check_sizeof (const char *includes, const char *cflags, const char *tname)
+int ac_get_sizeof (const char *includes, const char *cflags, const char *tname)
 {
 	return aci_check_sizeof (includes, cflags, tname, 1);
 }
@@ -2284,14 +2189,14 @@ int aci_check_define (const char *includes, const char *cflags,
 
 
 // Same as above buf informing the user about the check.
-int ac_check_define (const char *includes, const char *cflags,
-                     const char *defname)
+int ac_has_define (const char *includes, const char *cflags,
+                   const char *defname)
 {
 	int isdefined = aci_check_define (includes, cflags, defname);
 	printf ("Has %s defined in headers [%s]%s%s: %s\n", defname, includes,
 	        cflags ? " " : "", cflags ? cflags : "",
 	        isdefined ? "yes" : "no");
-	fflush (stdout);            
+	fflush (stdout);
 	return isdefined;
 }
 
@@ -2300,7 +2205,7 @@ int ac_check_define (const char *includes, const char *cflags,
 // Check if the expression "expr" is a valid preprocessor expression after
 // including the files listed in "includes" and compiling with the
 // compilation flags "cflags".
-int ac_check_cpp_expression (const char *includes, const char *cflags,
+int ac_valid_cpp_expression (const char *includes, const char *cflags,
                              const char *expr)
 {
 	int ok;
@@ -2730,7 +2635,7 @@ static void aci_check_stdint (void)
 	aci_strlist_add_unique (&aci_tdefs, sbufchars (&sb), 0);
 	sbufcat (&stdint_proxy, sbufchars (&sb));
 
-	have_llong_max = ac_check_define ("limits.h", NULL, "LLONG_MAX");
+	have_llong_max = ac_has_define ("limits.h", NULL, "LLONG_MAX");
 
 	sbufcpy (&sb, "#ifndef INT64_C\n");
 	if (char_bits >= 64) {
@@ -2993,7 +2898,7 @@ leave:
 
 static void aci_check_builtin_overflow(void)
 {
-	ac_check_compile("Has GNU builtin overflow check",
+	ac_does_compile("Has GNU builtin overflow check",
 	    "bool foo(int a, int b, int *c) {\n"
 		"    return __builtin_add_overflow(a, b, c);\n"
 		"}\n", NULL, "GCC_OVERFLOW");
@@ -3017,7 +2922,7 @@ static void aci_check_woe32 (void)
 
 
 // Are we running under Woe.
-int ac_check_woe32 (void)
+int ac_has_woe32 (void)
 {
 	return aci_have_woe32;
 }
@@ -3029,7 +2934,7 @@ static void check_inline_assembly (void)
 	int have_retaddr = 1;
 	int have_backtrace;
 
-	ac_check_compile ("Has GNU style inline assembly",
+	ac_does_compile ("Has GNU style inline assembly",
 	    "int swap_local(volatile int *x, int newv) {\n"
 		"    int res = newv;\n"
 		"    __asm__ volatile (\"xchgl %0, (%2)\"\n"
@@ -3037,7 +2942,7 @@ static void check_inline_assembly (void)
 		"    return res; }\n", NULL,
 		"GNU_STYLE_ASSEMBLY");
 
-	ac_check_compile ("Has register pseudovariables and __emit__",
+	ac_does_compile ("Has register pseudovariables and __emit__",
 	    "unsigned int foo(void) {\n"
 		"    unsigned int lo, hi;\n"
 		"   __emit__(0x0f, 0x31);   // rdtsc\n"
@@ -3046,11 +2951,11 @@ static void check_inline_assembly (void)
 		"   return (hi + lo);\n}\n", NULL,
 		"REGISTER_PSEUDOVARS");
 
-	if (ac_check_compile ("Has _ReturnAddress()",
+	if (ac_does_compile ("Has _ReturnAddress()",
 	    "void* foo(void) { return _ReturnAddress(); }\n",
 	    NULL, "MSC_RETURN_ADDRESS")) {
 		/* Do nothing. Use the builtin function. */
-	} else if (ac_check_compile ("Has __builtin_return_address",
+	} else if (ac_does_compile ("Has __builtin_return_address",
 	        "void* foo(void) { return __builtin_return_address(0); }\n",
 	        NULL, "BUILTIN_RETURN_ADDRESS")) {
 		ac_add_code ("#define _ReturnAddress() __builtin_return_address(0)", 1);
@@ -3058,7 +2963,7 @@ static void check_inline_assembly (void)
 		have_retaddr = 0;
 	}
 
-	have_backtrace = ac_check_proto ("execinfo.h", NULL, "backtrace");
+	have_backtrace = ac_has_proto ("execinfo.h", NULL, "backtrace");
 
 	if (!have_retaddr) {
 		if (have_backtrace) {
@@ -3077,7 +2982,7 @@ static void check_inline_assembly (void)
 static void aci_check_align_keyword (void)
 {
 	sbuf_t sb;
-	int have_align = ac_check_compile ("Has __attribute__((aligned(n)))",
+	int have_align = ac_does_compile ("Has __attribute__((aligned(n)))",
 	                    "__attribute__((aligned(16))) int x;\n",
 	                    NULL, "ALIGNED");
 	sbufinit (&sb);
@@ -3085,7 +2990,7 @@ static void aci_check_align_keyword (void)
 	        aci_attrib_pfx);
 	if (have_align) {
 		sbufcat (&sb, "__attribute__((aligned(n)))");
-	} else if (ac_check_compile ("Has __declspec(align(n))",
+	} else if (ac_does_compile ("Has __declspec(align(n))",
 	                    "__declspec(align(16)) int x;\n",
 	                    NULL, "ALIGNED")) {
 		sbufcat (&sb, "__declspec(align(n))");
@@ -3143,7 +3048,7 @@ static void aci_check_stdbool (void)
 
 static void aci_check_va_copy (void)
 {
-	if (ac_check_define ("stdarg.h", NULL, "va_copy")) {
+	if (ac_has_define ("stdarg.h", NULL, "va_copy")) {
 		ac_add_code ("/* Ensure that va_copy is available.*/\n#include <stdarg.h>\n", 1);
 	} else {
 		ac_add_code ("/* Ensure that va_copy is available.*/\n#include <stdarg.h>\n"
@@ -3157,7 +3062,7 @@ static void aci_check_va_copy (void)
 static void aci_check_variadic_macros (void)
 {
 	static const char src[] = "#define VAM(...) printf(__VA_ARGS__)\n";
-	aci_variadic_macros = ac_check_compile ("Has C99 variadic macros", src, NULL, "VARIADIC_MACROS");
+	aci_variadic_macros = ac_does_compile ("Has C99 variadic macros", src, NULL, "VARIADIC_MACROS");
 }
 
 
@@ -3341,7 +3246,7 @@ int aci_check_func_attribute_with_args (const char *body_att,
 
 
 
-int ac_check_var_attribute (const char *attribute, const char *external, Attsyn as)
+int ac_has_var_attribute (const char *attribute, const char *external, Attsyn as)
 {
 	sbuf_t sb1, sb2, sb3;
 	int res = 0;
@@ -3407,7 +3312,7 @@ clean:
 	return res;
 }
 
-int ac_check_func_attribute (const char *attribute, const char *external,
+int ac_has_func_attribute (const char *attribute, const char *external,
         int usedef, int literal, Attsyn as)
 {
 	sbuf_t sb1, sb2, sb3;
@@ -3565,18 +3470,18 @@ void aci_check_att_format (void)
 
 // See if the compiler supports the compilation flag "flag". If it does set
 // the makefile variable "makevar" to "flag".
-int ac_check_compiler_flag (const char *flag, const char *makevar)
+int ac_has_compiler_flag (const char *flag, const char *makevar)
 {
 	printf ("Does the compiler accept the option %s ", flag);
 	if (aci_can_compile_link ("int func(int x) { return x; }\nint main () { return func(42); }\n", flag, NULL, 0)) {
 		ac_set_var (makevar, flag);
 		printf ("yes\n");
 		fflush (stdout);
-		return 0;
+		return 1;
 	} else {
 		printf ("no\n");
 		fflush (stdout);
-		return -1;
+		return 0;
 	}
 }
 
@@ -3610,15 +3515,9 @@ static void aci_check_ssize (void)
 static void aci_check_char32 (void)
 {
 	sbuf_t sb;
-	int have = ac_check_type ("", NULL, "char32_t");
-	ac_check_type_tag ("uchar.h", NULL, "char32_t", "CHAR32_T_IN_UCHAR_H");
-	ac_check_headers ("cuchar", NULL);
-
-#if 0
-	if (have) {
-		sbufcat (&aci_testing_flags, " -D__STDC_UTF_32__");
-	}
-#endif
+	ac_has_type ("", NULL, "char32_t");
+	ac_has_type_tag ("uchar.h", NULL, "char32_t", "CHAR32_T_IN_UCHAR_H");
+	ac_has_headers ("cuchar", NULL);
 
 	// Ensure that wchar_t is always distinct from char16_t and char32_t.
 	// This is what the C++11 standard says.
@@ -3645,14 +3544,14 @@ static void aci_check_char32 (void)
 
 	ac_add_code (sbufchars (&sb), 1);
 
-	if (ac_check_compile ("Has U\"text\" support",
+	if (ac_does_compile ("Has U\"text\" support",
 	                      "const void *p = U\"text\";\n",
 	                      NULL, "NATIVE_U_ESCAPE")) {
 		ac_add_code ("#ifndef UCS\n#define UCS(X) U##X\n#endif\n", 1);
 		ac_add_code ("#ifndef __cpp_unicode_literals\n"
 				 "  #define __cpp_unicode_literals 200710\n"
 				 "#endif\n", 1);
-	} else if (ac_check_sizeof ("stddef.h", NULL, "wchar_t") == 4) {
+	} else if (ac_get_sizeof ("stddef.h", NULL, "wchar_t") == 4) {
 		ac_add_code ("#ifndef UCS\n#define UCS(X) ((const char32_t*)L##X)\n#endif\n", 1);
 	} else {
 		printf ("can't find a suitable definition for UCS-4 encoded string literals.\n");
@@ -3665,32 +3564,28 @@ static void aci_check_char32 (void)
 
 static void aci_check_c11_atomics (void)
 {
-	int has_atomic_size_type, has_atomic_load_explicit, has_atomic_store_explicit;
-	int has_atomic_exchange_explicit, has_cas_explicit;
-	int has_add_explicit, has_sub_explicit;
-
-	has_atomic_size_type = ac_check_compile ("Has native support for atomic_size_t",
+	ac_does_compile ("Has native support for atomic_size_t",
 	      "#include <stdatomic.h>\natomic_size_t x = ATOMIC_INIT_VAR(0);\n", NULL, "ATOMIC_SIZE_T");
 
-	has_atomic_load_explicit = ac_check_compile ("Has atomic_load_explicit",
+	ac_does_compile ("Has atomic_load_explicit",
 	      "#include <stdatomic.h>\n"
 		  "atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "size_t foo (void) { return atomic_load_explicit (&x, memory_order_acquire); }\n",
 		  NULL, "ATOMIC_LOAD_EXPLICIT");
 
-	has_atomic_store_explicit = ac_check_compile ("Has atomic_store_explicit",
+	ac_does_compile ("Has atomic_store_explicit",
 	      "#include <stdatomic.h>\n"
 		  "atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "void foo (size_t v) { atomic_store_explicit (&x, v, memory_order_release); }\n",
 		  NULL, "ATOMIC_STORE_EXPLICIT");
 
-	has_atomic_exchange_explicit = ac_check_compile ("Has atomic_exchange_explicit",
+	ac_does_compile ("Has atomic_exchange_explicit",
 	      "#include <stdatomic.h>\n"
 		  "atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "size_t foo (size_t v) { return atomic_exchange_explicit (&x, v, memory_order_acq_rel); }\n",
 		  NULL, "ATOMIC_EXCHANGE_EXPLICIT");
 
-	has_cas_explicit = ac_check_compile ("Has atomic_compare_exchange_weak_explicit",
+	ac_does_compile ("Has atomic_compare_exchange_weak_explicit",
 	      "#include <stdatomic.h>\n"
 		  "atomic_int = ATOMIC_INIT_VAR(0);\n"
 		  "int foo (size_t v) { \n"
@@ -3698,7 +3593,7 @@ static void aci_check_c11_atomics (void)
 		  "}\n",
 		  NULL, "ATOMIC_COMPARE_EXCHANGE_WEAK_EXPLICIT");
 
-	has_add_explicit = ac_check_compile ("Has atomic_fetch_add_explicit",
+	ac_does_compile ("Has atomic_fetch_add_explicit",
 	      "#include <stdatomic.h>\n"
 		  "atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "size_t foo (size_t v) { \n"
@@ -3706,7 +3601,7 @@ static void aci_check_c11_atomics (void)
 		  "}\n",
 		  NULL, "ATOMIC_FETCH_SUB_EXPLICIT");
 
-	has_sub_explicit = ac_check_compile ("Has atomic_fetch_sub_explicit",
+	ac_does_compile ("Has atomic_fetch_sub_explicit",
 	      "#include <stdatomic.h>\n"
 		  "atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "size_t foo (size_t v) { \n"
@@ -3715,25 +3610,25 @@ static void aci_check_c11_atomics (void)
 		  NULL, "ATOMIC_FETCH_SUB_EXPLICIT");
 
 
-	has_atomic_load_explicit = ac_check_compile ("Has std::atomic_load_explicit",
+	ac_does_compile ("Has std::atomic_load_explicit",
 	      "#include <atomic>\n"
 		  "std::atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "size_t foo (void) { return std::atomic_load_explicit (&x, std::memory_order_acquire); }\n",
 		  NULL, "CXX_ATOMIC_LOAD_EXPLICIT");
 
-	has_atomic_store_explicit = ac_check_compile ("Has std::atomic_store_explicit",
+	ac_does_compile ("Has std::atomic_store_explicit",
 	      "#include <atomic>\n"
 		  "std::atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "void foo (size_t v) { std::atomic_store_explicit (&x, v, std::memory_order_release); }\n",
 		  NULL, "CXX_ATOMIC_STORE_EXPLICIT");
 
-	has_atomic_exchange_explicit = ac_check_compile ("Has std::atomic_exchange_explicit",
+	ac_does_compile ("Has std::atomic_exchange_explicit",
 	      "#include <atomic>\n"
 		  "std::atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "size_t foo (size_t v) { return std::atomic_exchange_explicit (&x, v, std::memory_order_acq_rel); }\n",
 		  NULL, "CXX_ATOMIC_EXCHANGE_EXPLICIT");
 
-	has_cas_explicit = ac_check_compile ("Has std::atomic_compare_exchange_weak_explicit",
+	ac_does_compile ("Has std::atomic_compare_exchange_weak_explicit",
 	      "#include <atomic>\n"
 		  "std::atomic_int x = ATOMIC_INIT_VAR(0);\n"
 		  "int foo (size_t v) { \n"
@@ -3741,7 +3636,7 @@ static void aci_check_c11_atomics (void)
 		  "}\n",
 		  NULL, "CXX_ATOMIC_COMPARE_EXCHANGE_WEAK_EXPLICIT");
 
-	has_add_explicit = ac_check_compile ("Has std::atomic_fetch_add_explicit",
+	ac_does_compile ("Has std::atomic_fetch_add_explicit",
 	      "#include <atomic>\n"
 		  "std::atomic_int x = 0;\n"
 		  "size_t foo (size_t v) { \n"
@@ -3749,7 +3644,7 @@ static void aci_check_c11_atomics (void)
 		  "}\n",
 		  NULL, "CXX_ATOMIC_FETCH_ADD_EXPLICIT");
 
-	has_sub_explicit = ac_check_compile ("Has std::atomic_fetch_sub_explicit",
+	ac_does_compile ("Has std::atomic_fetch_sub_explicit",
 	      "#include <atomic>\n"
 		  "std::atomic_size_t x = 0;\n"
 		  "size_t foo (size_t v) { \n"
@@ -3769,7 +3664,7 @@ static void aci_check_misc_once (void)
 	sbufinit (&sb);
 
 	/* Enable GNU __attribute__ syntax. */
-	has_att = ac_check_compile ("Has native support for __attribute__(()) syntax",
+	has_att = ac_does_compile ("Has native support for __attribute__(()) syntax",
 	    "__attribute__((unused)) void foo(void);\n", NULL, "GCC_ATTRIBUTE");
 
 	aci_check_thread_local ();
@@ -3801,7 +3696,7 @@ static void aci_check_misc_once (void)
 	if (aci_check_define (NULL, NULL, "__MINGW32__")) {
 		 printf ("detected mingw\n");
 		 fflush (stdout);
-		 ac_check_compiler_flag ("-posix", "GCC_POSIX");
+		 ac_has_compiler_flag ("-posix", "GCC_POSIX");
 	}
 
 
@@ -3827,15 +3722,15 @@ static void aci_check_misc_once (void)
 
 	if (has_att) {
 		if (aci_have_woe32) {
-			ac_check_func_attribute ("dllexport", "EXPORT", 1, 0, att_both);
-			ac_check_var_attribute ("dllimport", "IMPORT", att_both);
-		} else if (ac_check_func_attribute ("__visibility__(\"default\")", "EXPORT", 1, 1, att_both)) {
+			ac_has_func_attribute ("dllexport", "EXPORT", 1, 0, att_both);
+			ac_has_var_attribute ("dllimport", "IMPORT", att_both);
+		} else if (ac_has_func_attribute ("__visibility__(\"default\")", "EXPORT", 1, 1, att_both)) {
 			sbufformat (&sb, 1, "#define %s%sIMPORT %s%sEXPORT",
 			            aci_macro_prefix, aci_attrib_pfx, aci_macro_prefix,
 			            aci_attrib_pfx);
 			ac_add_code (sbufchars (&sb), 1);
 		} else {
-			ac_check_func_attribute ("visibility(\"default\")", "EXPORT", 1, 1, att_both);
+			ac_has_func_attribute ("visibility(\"default\")", "EXPORT", 1, 1, att_both);
 			sbufformat (&sb, 1, "#define %s%sIMPORT %s%sEXPORT",
 			            aci_macro_prefix, aci_attrib_pfx, aci_macro_prefix,
 			            aci_attrib_pfx);
@@ -3862,8 +3757,8 @@ static void aci_check_misc_once (void)
 		        aci_attrib_pfx);
 		ac_add_code (sbufchars (&sb), 1);
 	} else if (has_att) {
-		if (!ac_check_func_attribute ("__visibility__(\"hidden\")", "HIDDEN", 1, 1, att_both)) {
-			ac_check_func_attribute ("visibility(\"hidden\")", "HIDDEN", 1, 1, att_both);
+		if (!ac_has_func_attribute ("__visibility__(\"hidden\")", "HIDDEN", 1, 1, att_both)) {
+			ac_has_func_attribute ("visibility(\"hidden\")", "HIDDEN", 1, 1, att_both);
 		}
 	} else if (aci_can_compile ("__hidden int foo(int x) { return 2 * x; }\n", NULL)) {
 		sbufformat (&sb, 1, "#define %s%sHIDDEN __hidden", aci_macro_prefix,
@@ -3875,22 +3770,22 @@ static void aci_check_misc_once (void)
 		ac_add_code (sbufchars (&sb), 1);
 	}
 
-	ac_check_func_attribute ("deprecated", "DEPRECATED", 0, 0, att_both);
-	ac_check_func_attribute ("warn_unused_result", "WARN_UNUSED_RESULT", 0, 0, att_both);
-	ac_check_func_attribute ("nodiscard", "NODISCARD", 0, 0, att_cxx11);
-	ac_check_func_attribute ("unused", "UNUSED", 0, 0, att_both);
-	ac_check_func_attribute ("maybe_unused", "MAYBE_UNUSED", 0, 0, att_cxx11);
+	ac_has_func_attribute ("deprecated", "DEPRECATED", 0, 0, att_both);
+	ac_has_func_attribute ("warn_unused_result", "WARN_UNUSED_RESULT", 0, 0, att_both);
+	ac_has_func_attribute ("nodiscard", "NODISCARD", 0, 0, att_cxx11);
+	ac_has_func_attribute ("unused", "UNUSED", 0, 0, att_both);
+	ac_has_func_attribute ("maybe_unused", "MAYBE_UNUSED", 0, 0, att_cxx11);
 
 
 	aci_check_att_format ();
 
-	has_func_name = ac_check_compile("Has the C99 __func__ identifier",
+	has_func_name = ac_does_compile("Has the C99 __func__ identifier",
 	            "void show(const char *s);\n"
 				"void foo(void) {   const char *me = __func__;  show(me); }\n",
 				NULL, "C99_FUNCNAME");
 
 	if (!has_func_name) {
-		has_func_name = ac_check_compile("Has the __FUNC__ identifier",
+		has_func_name = ac_does_compile("Has the __FUNC__ identifier",
 		            "void show(const char *s);\n"
 					"void foo(void) { const char *me = __FUNC__; show(me); }\n",
 					NULL, "UPPER_CASE_FUNC");
@@ -3927,12 +3822,12 @@ static void aci_check_misc_once (void)
 		ac_add_code ("#define GCC_VISIBILITY_POP", 1);
 	}
 
-	if (!ac_check_compile ("Has __COUNTER__ macro", "int x[__COUNTER__ + 2];\n",
+	if (!ac_does_compile ("Has __COUNTER__ macro", "int x[__COUNTER__ + 2];\n",
 	                       NULL, "COUNTER_MACRO")) {
 		ac_add_code ("#define __COUNTER__ __LINE__", 1);
 	}
 
-	if (!ac_check_link ("Has __builtin_expect()",
+	if (!ac_does_compile_and_link ("Has __builtin_expect()",
 	                       "int main(int argc, char**argv) { \n"
 						   "   if (__builtin_expect(argc,1) == 1) {\n"
 						   "      return 2;\n"
@@ -3976,7 +3871,7 @@ void ac_check_same_cxx_types (const char *includes, const char *cflags,
 		"typedef int foo[Equal<");
 	sbufformat (&source, 0, "%s, %s>::yes ? 1 : -1];\n", t1, t2);
 
-	ac_check_compile (sbufchars (&sb), sbufchars (&source), cflags, tag);
+	ac_does_compile (sbufchars (&sb), sbufchars (&source), cflags, tag);
 
 	sbuffree (&sb);
 	sbuffree (&source);
@@ -3987,7 +3882,7 @@ void ac_check_same_cxx_types (const char *includes, const char *cflags,
 static void aci_check_sfinae (void)
 {
 	/* Example taken from Alexandrescu's Modern C++ design. */
-	ac_check_compile_fail ("Has buggy SFINAE",
+	ac_does_compile_fail ("Has buggy SFINAE",
 	    "template <class T, class U>\n"
 		"class Conversion {\n"
 		"   typedef char Small;\n"
@@ -4103,7 +3998,7 @@ static void aci_check_buggy_using (void)
 		"};\n"
 		"int main() { Bar<float> bf; bf.set(); return 0; }\n";
 
-	ac_check_compile_fail ("Has bug when using correct syntax for template dependent bases",
+	ac_does_compile_fail ("Has bug when using correct syntax for template dependent bases",
 	                 src, NULL, "BUGGY_DEP_BASE");
 }
 
@@ -4121,14 +4016,14 @@ static void aci_check_strong_using (void)
 	// the inline keyword. The C++11 standard says the inline keyword is
 	// optional when reopening the inline namespace (C++11, 7.3.1, par. 7)
 
-	if (ac_check_compile ("Has C++11 inline namespace",
+	if (ac_does_compile ("Has C++11 inline namespace",
 	        "namespace enclosing {\n"
 			"    inline namespace inner { int x; }\n"
 			"    namespace inner { int y; }\n"
 			"}\n",
 			NULL, "CXX_INLINE_NS")) {
 		sbufcat (&sb, "inline namespace N {}");
-	} else if (ac_check_compile ("Has GCC's strong using namespace",
+	} else if (ac_does_compile ("Has GCC's strong using namespace",
 	            "namespace enclosing { namespace inner {}\n"
 				"using namespace inner __attribute__((__strong__));}\n",
 				NULL, "STRONG_ALIAS")) {
@@ -4154,7 +4049,7 @@ static void aci_check_cv_overload (void)
 		"template <class T> struct remove_cv<const volatile T>   { typedef T type; };\n"
 		"template <class T> struct remove_cv<const volatile T&>  { typedef T &type; };\n";
 
-	ac_check_compile_fail ("Has bug with cv-qualified templates",
+	ac_does_compile_fail ("Has bug with cv-qualified templates",
 	            src, NULL, "BUGGY_CV_TEMPLATE");
 }
 
@@ -4168,11 +4063,11 @@ static void aci_check_decltype (void)
 
 	sbufinit (&sb);
 
-	has_dt = ac_check_compile ("Has the C++11 decltype keyword",
+	has_dt = ac_does_compile ("Has the C++11 decltype keyword",
 	        "double f();   decltype(f()) x;\n",
 	        NULL, "CXX_DECLTYPE_NATIVE");
 
-	has_gcc_typeof = ac_check_compile ("Has the GCC typeof extension",
+	has_gcc_typeof = ac_does_compile ("Has the GCC typeof extension",
 	                  "double f();   __typeof__(f()) x;\n",
 	                  NULL, "GCC_TYPEOF");
 
@@ -4199,7 +4094,7 @@ static void aci_check_decltype (void)
 
 static void aci_check_auto (void)
 {
-	ac_check_compile ("Has the C++11 auto keyword",
+	ac_does_compile ("Has the C++11 auto keyword",
 	                  "int foo() { return 42; }\n"
 				"int bar() { auto v = foo(); return v; }\n",
 				NULL, "CXX_AUTO");
@@ -4218,7 +4113,7 @@ static void aci_check_auto (void)
 
 static void aci_check_abi_tag (void)
 {
-	int b = ac_check_compile ("Has the gnu::abi_tag attribute",
+	int b = ac_does_compile ("Has the gnu::abi_tag attribute",
 	            "struct __attribute__((abi_tag(\"foo\"))) Foo { int x; };\n",
 	            NULL, "GCC_ABI_TAG");
 
@@ -4242,7 +4137,7 @@ static void aci_check_intmax_template_param (void)
 		sbufcat (&sb, " foo_t;\n"
 			"template <foo_t N> struct Foo { static const foo_t value = N; };\n"
 			"foo_t instantiate() { return Foo<42>::value; }\n");
-		ac_check_compile ("Has template arithmetic on int64_t",
+		ac_does_compile ("Has template arithmetic on int64_t",
 		            sbufchars (&sb), NULL, "TEMPLATE_ARITHMETIC_64");
 		sbuffree (&sb);
 	}
@@ -4252,7 +4147,7 @@ static void aci_check_intmax_template_param (void)
 // Check for C++11 explicit extern template instantiation control.
 static void aci_check_extern_templ_inst (void)
 {
-	ac_check_compile ("Has C++11 extern template explicit instantiation",
+	ac_does_compile ("Has C++11 extern template explicit instantiation",
 	        "template <class T> struct kk { void foo(); };\n"
 			"extern template class kk<int>;\n", NULL,
 			"CXX_EXTERN_TEMPLATE_INST");
@@ -4261,7 +4156,7 @@ static void aci_check_extern_templ_inst (void)
 
 static void aci_check_rvalue_refs (void)
 {
-	ac_check_compile ("Has C++11 rvalue references",
+	ac_does_compile ("Has C++11 rvalue references",
 	        "void foo(int &&);\n", NULL, "CXX_RVALUE_REFS");
 
 	// Define the macro name from N3694.
@@ -4273,7 +4168,7 @@ static void aci_check_rvalue_refs (void)
 
 static void aci_check_variadic_templates (void)
 {
-	ac_check_compile ("Has C++11 variadic templates",
+	ac_does_compile ("Has C++11 variadic templates",
 	        "template <class T1, class ... Args> void print (const T1 &t, Args ... args);\n",
 	        NULL, "CXX_VARIADIC_TEMPLATES");
 
@@ -4285,7 +4180,7 @@ static void aci_check_variadic_templates (void)
 
 static void aci_check_override (void)
 {
-	ac_check_compile ("Has C++11 override",
+	ac_does_compile ("Has C++11 override",
 	        "struct Base { virtual void foo (float); };\n"
 			"struct Derived : Base { virtual void foo (float) override; };\n",
 			NULL, "CXX_OVERRIDE");
@@ -4299,7 +4194,7 @@ static void aci_check_override (void)
 
 static void aci_check_final (void)
 {
-	ac_check_compile ("Has C++11 final", "struct Base final {};\n",
+	ac_does_compile ("Has C++11 final", "struct Base final {};\n",
 	                              NULL, "CXX_FINAL");
 
 	ac_add_code ("#ifdef HAVE_CXX_FINAL\n"
@@ -4312,7 +4207,7 @@ static void aci_check_final (void)
 
 static void aci_check_constexpr (void)
 {
-	ac_check_compile ("Has C++11 constexpr",
+	ac_does_compile ("Has C++11 constexpr",
 	                              "struct Foo { int x;  constexpr Foo (int i) : x(i) {} };\n",
 	                              NULL, "CXX_CONSTEXPR");
 	ac_add_code ("#ifndef HAVE_CXX_CONSTEXPR\n"
@@ -4383,7 +4278,7 @@ void ac_replace_funcs (const char *includes, const char *cflags, const char *fun
 
 		if (sow != eow) {
 			sbufncpy (&sb, sow, eow - sow);
-			if (!ac_check_proto (includes, cflags, sbufchars (&sb))) {
+			if (!ac_has_proto (includes, cflags, sbufchars (&sb))) {
 				ac_libobj (sbufchars (&sb));
 			}
 		}
@@ -4590,10 +4485,10 @@ void aci_add_cmd_vars(int argc, char **argv)
 
 
 // Check if the option "name" was given and put its value in dest.
-ptrdiff_t ac_have_feature (const char *name, char *dest, size_t dest_size)
+int ac_has_feature (const char *name, char *dest, size_t dest_size)
 {
 	aci_varnode_t *vn;
-	ptrdiff_t result = -1;
+	int result = 0;
 	sbuf_t feature;
 	sbuf_t value;
 
@@ -4625,7 +4520,7 @@ ptrdiff_t ac_have_feature (const char *name, char *dest, size_t dest_size)
 				memcpy (dest, sbufchars (&value), needed + 1);
 			}
 		}
-		result = needed;
+		result = 1;
 	}
 	sbuffree (&feature);
 	sbuffree (&value);
@@ -4639,12 +4534,12 @@ static void aci_cleanup (void)
 	sbuf_t sb;
 
 	/* Created by aci_run_silent() */
-	remove ("__temp1__");
-	remove ("__temp2__");
+	remove (aci_stdout_dummy);
+	remove (aci_stderr_dummy);
 
 	/* Remove the source file */
 	sbufinit (&sb);
-	sbufcpy (&sb, "_test_");
+	sbufcpy (&sb, aci_test_file);
 	sbufcat (&sb, aci_source_extension);
 	remove (sbufchars (&sb));
 	sbuffree (&sb);
@@ -4722,7 +4617,7 @@ static int aci_get_make_var (const char *varname, char *s, size_t n)
 	remove (dummy_txt);
 
 	sbufinit (&cmd);
-	sbufformat (&cmd, 1, "%s -f%s %s >__kkkk1", aci_make_cmd, dummy_mk, dummy_txt);
+	sbufformat (&cmd, 1, "%s -f%s %s >%s", aci_make_cmd, dummy_mk, dummy_txt, aci_stdout_dummy);
 	system (sbufchars (&cmd));
 	sbuffree (&cmd);
 
@@ -5203,7 +5098,7 @@ done:
 static void aci_get_prefix(void)
 {
 	char pfx[FILENAME_MAX];
-	ptrdiff_t n = ac_have_feature ("prefix", pfx, sizeof pfx);
+	ptrdiff_t n = ac_has_feature ("prefix", pfx, sizeof pfx);
 
 	if (n > 0 && n < (ptrdiff_t)(sizeof pfx) + 1) {
 		if (pfx[n - 1] != '/') {
@@ -5236,12 +5131,12 @@ static void aci_check_gcc_flags (int prefer_cxx)
 {
 	sbufcat (&aci_testing_flags, " -Werror");
 	if (!aci_target_arch_given) {
-		 if (ac_check_compiler_flag ("-march=native", "TARGET_ARCH") == 0) {
+		 if (ac_has_compiler_flag ("-march=native", "TARGET_ARCH")) {
 			 sbufcat (&aci_testing_flags, " -march=native");
 		 }
 	}
 
-	if (ac_check_compiler_flag ("-fpic", "GCC_FPIC") == 0) {
+	if (ac_has_compiler_flag ("-fpic", "GCC_FPIC")) {
 		 sbufcat (&aci_testing_flags, " -fpic");
 	}
 
@@ -5250,58 +5145,67 @@ static void aci_check_gcc_flags (int prefer_cxx)
 	   1% on x64 and around 5% on i386.
 	   See http://d-sbd.alioth.debian.org/www/?page=pax_pie
 	 */
-	ac_check_compiler_flag ("-fpie", "GCC_FPIE");
+	ac_has_compiler_flag ("-fpie", "GCC_FPIE");
 	if (aci_have_woe32) {
-		ac_check_compiler_flag ("-Wl,--dynamicbase,--nxcompat", "GCC_PIE");
+		ac_has_compiler_flag ("-Wl,--dynamicbase,--nxcompat", "GCC_PIE");
 	} else {
-		ac_check_compiler_flag ("-pie", "GCC_PIE");
+		ac_has_compiler_flag ("-pie", "GCC_PIE");
 	}
 
-	ac_check_compiler_flag ("-fextended-identifiers", "GCC_EXTIDENT");
-	if (ac_check_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN") == 0) {
+	// It seems that from GCC5 onwards the option -fextended-identifiers is
+	// enabled by default.
+	ac_has_compiler_flag ("-fextended-identifiers", "GCC_EXTIDENT");
+	if (ac_has_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN")) {
 		 sbufcat (&aci_testing_flags, " -fvisibility=hidden");
 	}
-	if (ac_check_compiler_flag ("-Wl,--enable-new-dtags", "GCC_NEWDTAGS") == 0) {
+	ac_has_compiler_flag ("-fvisibility-inlines-hidden", "GCC_VISIBILITY_INLINES_HIDDEN");
+
+	if (ac_has_compiler_flag ("-Wl,--enable-new-dtags", "GCC_NEWDTAGS")) {
 		 sbufcat (&aci_testing_flags, " -Wl,--enable-new-dtags");
 	}
-	if (ac_check_compiler_flag ("-Wl,--rpath='$$ORIGIN'", "GCC_RPATH_LIB") == 0) {
-	   ac_set_var ("GCC_RPATH_BIN", "-Wl,--rpath='$$ORIGIN/../lib'");
+	if (ac_has_compiler_flag ("-Wl,--rpath='$$ORIGIN'", "GCC_RPATH_LIB")) {
+		 ac_set_var ("GCC_RPATH_BIN", "-Wl,--rpath='$$ORIGIN/../lib'");
 		 ac_set_var ("GCC_RPATH_LIB", "-Wl,--rpath='$$ORIGIN'");
 		 ac_set_var ("GCC_RPATH_PREFIX", "-Wl,--rpath=$(PREFIX)lib");
 	}
 
-	if (ac_check_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED") == 0) {
+	if (ac_has_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED")) {
 		 sbufcat (&aci_testing_flags, " -Wl,--as-needed");
 	}
-	if (ac_check_compiler_flag ("-mthreads", "GCC_MTHREADS") == 0) {
+	if (ac_has_compiler_flag ("-mthreads", "GCC_MTHREADS")) {
 		 sbufcat (&aci_testing_flags, " -mthreads");
 	}
-	ac_check_compiler_flag ("-O2", "GCC_O2");
-	ac_check_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
-	ac_check_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
-	ac_check_compiler_flag ("-ffast-math", "GCC_FASTMATH");
-	ac_check_compiler_flag ("-ggdb", "GCC_G") || ac_check_compiler_flag ("-g", "GCC_G");
-	ac_check_compiler_flag ("-fstack-protector", "GCC_STACK_PROTECTOR");
-	ac_check_compiler_flag ("-fstack-protector-all", "GCC_STACK_PROTECTOR_ALL");
-	ac_check_compiler_flag ("-fsanitize=address", "GCC_SANITIZE_ADDRESS");
-	ac_check_compiler_flag ("-fsanitize=leak", "GCC_SANITIZE_LEAK");
-	ac_check_compiler_flag ("-fsanitize=thread", "GCC_SANITIZE_THREAD");
+	ac_has_compiler_flag ("-O2", "GCC_O2");
+	ac_has_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
+	ac_has_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
+	ac_has_compiler_flag ("-ffast-math", "GCC_FASTMATH");
+	ac_has_compiler_flag ("-ggdb", "GCC_G") || ac_has_compiler_flag ("-g", "GCC_G");
+	ac_has_compiler_flag ("-fstack-protector", "GCC_STACK_PROTECTOR");
+	ac_has_compiler_flag ("-fstack-protector-all", "GCC_STACK_PROTECTOR_ALL");
+	ac_has_compiler_flag ("-fsanitize=address", "GCC_SANITIZE_ADDRESS");
+	ac_has_compiler_flag ("-fsanitize=leak", "GCC_SANITIZE_LEAK");
+	ac_has_compiler_flag ("-fsanitize=thread", "GCC_SANITIZE_THREAD");
 
-	// Does not work in Cygwin yet.
+	/* Does not work in Cygwin yet. */
 	if (!aci_have_woe32) {
-		ac_check_compiler_flag ("-gsplit-dwarf", "GCC_SPLIT_DWARF");
-		ac_check_compiler_flag ("-Wa,--compress-debug-sections", "GCC_COMPRESS_DEBUG_SECTIONS");
+		ac_has_compiler_flag ("-gsplit-dwarf", "GCC_SPLIT_DWARF");
+		ac_has_compiler_flag ("-Wa,--compress-debug-sections", "GCC_COMPRESS_DEBUG_SECTIONS");
 	}
-	ac_check_compiler_flag ("-Wl,--gdb-index", "GCC_GDB_INDEX");
-	ac_check_compiler_flag ("-ftrapv", "GCC_TRAPV");
-	ac_check_compiler_flag ("-fnon-call-exception", "GCC_NON_CALL_EXCEPTION");
-	ac_check_compiler_flag ("-Wabi-tag", "GCC_WABI_TAG");
+	ac_has_compiler_flag ("-Wl,--gdb-index", "GCC_GDB_INDEX");
+	ac_has_compiler_flag ("-fnon-call-exception", "GCC_NON_CALL_EXCEPTION");
+	ac_has_compiler_flag ("-Wabi-tag", "GCC_WABI_TAG");
+	/* WG14 and WG21 are ready to accept reality and require signed ints to be 2's
+	   complement. However they do not require that signed overflow wraps around. This goes
+	   against the expectations of many programs. */
+	ac_has_compiler_flag ("-Wstrict-overflow", "GCC_WSTRICT_OVERFLOW");
+	ac_has_compiler_flag ("-fwrapv", "GCC_FWRAPV");
+	ac_has_compiler_flag ("-ftrapv", "GCC_TRAPV");
 
-	if (ac_check_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME") == 0) {
+	if (ac_has_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME")) {
 		ac_set_var ("GCC_SONAME", "-Wl,--soname=$(notdir $@)");
 	}
 
-	if (ac_check_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB") == 0) {
+	if (aci_have_woe32 && ac_has_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB")) {
 		ac_set_var ("GCC_OUTIMPLIB", "-Wl,--out-implib=$@$(A)");
 	}
 
@@ -5311,23 +5215,23 @@ static void aci_check_gcc_flags (int prefer_cxx)
 
 	if (aci_use_stdver) {
 		if (prefer_cxx) {
-			if (ac_check_compiler_flag ("-std=gnu++17", "GCC_STD") == 0) {
+			if (ac_has_compiler_flag ("-std=gnu++17", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++17");
-			} else if (ac_check_compiler_flag ("-std=gnu++1z", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu++1z", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++1z");
-			} else if (ac_check_compiler_flag ("-std=gnu++14", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu++14", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++14");
-			} else if (ac_check_compiler_flag ("-std=gnu++1y", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu++1y", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++1y");
-			} else if (ac_check_compiler_flag ("-std=gnu++11", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu++11", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++11");
-			} else if (ac_check_compiler_flag ("-std=gnu++0x", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu++0x", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++0x");
 			}
 		} else {
-			if (ac_check_compiler_flag ("-std=gnu11", "GCC_STD") == 0) {
+			if (ac_has_compiler_flag ("-std=gnu11", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu11");
-			} else if (ac_check_compiler_flag ("-std=gnu99", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu99", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu99");
 			}
 		}
@@ -5354,28 +5258,32 @@ static void aci_check_gcc_flags (int prefer_cxx)
 
 	} else {
 		ac_add_var_append ("CFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_MTHREADS) $(GCC_STD)\\\n"
-						  "         $(GCC_TREEVECTORIZE) \\\n"
-						  "         $(GCC_FASTMATH) $(GCC_POSIX) $(GCC_EXTIDENT)");
-		ac_add_var_append ("SO_CFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_MTHREADS) $(GCC_FPIC)\\\n"
-							 "          $(GCC_STD) $(GCC_G) $(GCC_SPLIT_DWARF) \\\n"
+						  "         $(GCC_TREEVECTORIZE) $(GCC_WSTRICT_OVERFLOW) \\\n"
+						  "         $(GCC_FASTMATH) $(GCC_POSIX)\\\n"
+						  "         $(GCC_VISIBILITY_INLINES_HIDDEN)\n");
+		ac_add_var_append ("SO_CFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_MTHREADS) $(GCC_FPIC) \\\n"
+							 "          $(GCC_STD) $(GCC_G) $(GCC_SPLIT_DWARF) $(GCC_WSTRICT_OVERFLOW) \\\n"
+							 "          $(GCC_TREEVECTORIZE) $(GCC_FASTMATH) $(GCC_POSIX)\\\n"
+							 "          $(GCC_VISIBILITY_INLINES_HIDDEN)\n");
+		ac_add_var_append ("PIE_CFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_MTHREADS) $(GCC_FPIE) \\\n"
+							 "          $(GCC_STD) $(GCC_STATIC) \\\n"
 							 "          $(GCC_TREEVECTORIZE) $(GCC_FASTMATH) $(GCC_POSIX) $(GCC_EXTIDENT)\n");
-		ac_add_var_append ("PIE_CFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_MTHREADS) $(GCC_FPIE)\\\n"
-							 "          $(GCC_STD) $(GCC_STATIC)\\\n"
-							 "          $(GCC_TREEVECTORIZE) $(GCC_FASTMATH) $(GCC_POSIX) $(GCC_EXTIDENT)\n");
-		ac_add_var_append ("LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) $(GCC_RPATH_BIN)\\\n"
-						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) $(GCC_POSIX) $(GCC_EXTIDENT)\\\n");
-		ac_add_var_append ("PIE_LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) $(GCC_RPATH_BIN)\\\n"
-						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) $(GCC_POSIX) $(GCC_EXTIDENT)\\\n"
+		ac_add_var_append ("LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) $(GCC_RPATH_BIN) \\\n"
+						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) $(GCC_POSIX) \\\n");
+		ac_add_var_append ("PIE_LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) $(GCC_RPATH_BIN) \\\n"
+						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) $(GCC_POSIX) \\\n"
 						 "            $(GCC_PIE)");
 		ac_add_var_append ("SO_LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) \\\n"
 							  "         $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) \\\n"
-							  "         $(GCC_G) $(GCC_GDB_INDEX) $(GCC_SONAME) $(GCC_POSIX) $(GCC_EXTIDENT) -shared");
+							  "         $(GCC_G) $(GCC_GDB_INDEX) $(GCC_SONAME) $(GCC_POSIX) -shared");
 
 		ac_add_var_append ("CFLAGS_DEBUG", "$(GCC_G) $(GCC_STACK_PROTECTOR_ALL) $(GCC_COMPRESS_DEBUG_SECTIONS) $(GCC_SPLIT_DWARF) $(GCC_TRAPV) $(GCC_NON_CALL_EXCEPTION)");
 		ac_add_var_append ("CFLAGS_OPTIMIZE", "$(GCC_O2) $(GCC_OMITFRAMEPOINTER) -DNDEBUG");
 		ac_add_var_append ("LDFLAGS_DEBUG", "$(GCC_G) $(GCC_STACK_PROTECTOR_ALL) $(GCC_SPLIT_DWARF) $(GCC_GDB_INDEX) $(GCC_TRAPV) $(GCC_NON_CALL_EXCEPTION)");
 		ac_add_var_append ("LDFLAGS_OPTIMIZE", "$(GCC_O2)");
 	}
+
+	// Signed overflow. We use the same option as Rust: trap on overflow when debugging. Wrap around when optimized.
 }
 
 // Check for the availability of Tiny CC flags.
@@ -5383,43 +5291,43 @@ static void aci_check_tinyc_flags (void)
 {
 	sbufcat (&aci_testing_flags, " -Werror");
 	if (!aci_target_arch_given) {
-		 if (ac_check_compiler_flag ("-march=native", "TARGET_ARCH") == 0) {
+		 if (ac_has_compiler_flag ("-march=native", "TARGET_ARCH")) {
 			 sbufcat (&aci_testing_flags, " -march=native");
 		 }
 	}
 
-	if (ac_check_compiler_flag ("-fpic", "GCC_FPIC") == 0) {
+	if (ac_has_compiler_flag ("-fpic", "GCC_FPIC")) {
 		 sbufcat (&aci_testing_flags, " -fpic");
 	}
-	if (ac_check_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN") == 0) {
+	if (ac_has_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN")) {
 		 sbufcat (&aci_testing_flags, " -fvisibility=hidden");
 	}
-	if (ac_check_compiler_flag ("-Wl,--enable-new-dtags", "GCC_NEWDTAGS") == 0) {
+	if (ac_has_compiler_flag ("-Wl,--enable-new-dtags", "GCC_NEWDTAGS")) {
 		 sbufcat (&aci_testing_flags, " -Wl,--enable-new-dtags");
 	}
-	if (ac_check_compiler_flag ("-Wl,--rpath='$$ORIGIN'", "GCC_RPATH_LIB") == 0) {
+	if (ac_has_compiler_flag ("-Wl,--rpath='$$ORIGIN'", "GCC_RPATH_LIB")) {
 		 ac_set_var ("GCC_RPATH_BIN", "-Wl,--rpath='$$ORIGIN/../lib'");
 		 ac_set_var ("GCC_RPATH_LIB", "-Wl,--rpath='$$ORIGIN'");
 		 ac_set_var ("GCC_RPATH_PREFIX", "-Wl,--rpath=$(PREFIX)lib");
 	}
 
-	if (ac_check_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED") == 0) {
+	if (ac_has_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED")) {
 		 sbufcat (&aci_testing_flags, " -Wl,--as-needed");
 	}
-	if (ac_check_compiler_flag ("-mthreads", "GCC_MTHREADS") == 0) {
+	if (ac_has_compiler_flag ("-mthreads", "GCC_MTHREADS")) {
 		 sbufcat (&aci_testing_flags, " -mthreads");
 	}
-	ac_check_compiler_flag ("-O2 -s", "GCC_O2");
-	ac_check_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
-	ac_check_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
-	ac_check_compiler_flag ("-ffast-math", "GCC_FASTMATH");
-	ac_check_compiler_flag ("-g", "GCC_G");
+	ac_has_compiler_flag ("-O2 -s", "GCC_O2");
+	ac_has_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
+	ac_has_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
+	ac_has_compiler_flag ("-ffast-math", "GCC_FASTMATH");
+	ac_has_compiler_flag ("-g", "GCC_G");
 
-	if (ac_check_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME") == 0) {
+	if (ac_has_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME")) {
 		ac_set_var ("GCC_SONAME", "-Wl,--soname=$(notdir $@)");
 	}
 
-	if (ac_check_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB") == 0) {
+	if (ac_has_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB")) {
 		ac_set_var ("GCC_OUTIMPLIB", "-Wl,--out-implib=$@$(A)");
 	}
 
@@ -5428,9 +5336,9 @@ static void aci_check_tinyc_flags (void)
 	}
 
 	if (aci_use_stdver) {
-		  if (ac_check_compiler_flag ("-std=gnu11", "GCC_STD") == 0) {
+		  if (ac_has_compiler_flag ("-std=gnu11", "GCC_STD")) {
 			   sbufcat (&aci_testing_flags, " -std=gnu11");
-		  } else if (ac_check_compiler_flag ("-std=gnu99", "GCC_STD") == 0) {
+		  } else if (ac_has_compiler_flag ("-std=gnu99", "GCC_STD")) {
 			   sbufcat (&aci_testing_flags, " -std=gnu99");
 		  }
 	}
@@ -5460,48 +5368,48 @@ void aci_check_clang_flags (int prefer_cxx)
 	sbufcat (&aci_testing_flags, " -Werror");
 
 	if (!aci_target_arch_given) {
-		 if (ac_check_compiler_flag ("-march=native", "TARGET_ARCH") == 0) {
+		 if (ac_has_compiler_flag ("-march=native", "TARGET_ARCH")) {
 			 sbufcat (&aci_testing_flags, " -march=native");
 		 }
 	}
 
-	ac_check_compiler_flag ("-fpic", "GCC_FPIC");
+	ac_has_compiler_flag ("-fpic", "GCC_FPIC");
 
 	/* Use position independent executables for increased security
 	   According to some reports the run time overhead is negligible (less than
 	   1% on x64 and around 5% on i386.
 	   See http://d-sbd.alioth.debian.org/www/?page=pax_pie
 	 */
-	ac_check_compiler_flag ("-fpie", "GCC_FPIE");
-	ac_check_compiler_flag ("-pie", "GCC_PIE");
+	ac_has_compiler_flag ("-fpie", "GCC_FPIE");
+	ac_has_compiler_flag ("-pie", "GCC_PIE");
 
-	ac_check_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN");
-	ac_check_compiler_flag ("-Wl,--enable-new-dtags", "GCC_NEWDTAGS");
-	if (ac_check_compiler_flag ("-Wl,--rpath='$$ORIGIN'", "GCC_RPATH_LIB") == 0) {
+	ac_has_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN");
+	ac_has_compiler_flag ("-Wl,--enable-new-dtags", "GCC_NEWDTAGS");
+	if (ac_has_compiler_flag ("-Wl,--rpath='$$ORIGIN'", "GCC_RPATH_LIB")) {
 		 ac_set_var ("GCC_RPATH_BIN", "-Wl,--rpath='$$ORIGIN/../lib'");
 		 ac_set_var ("GCC_RPATH_LIB", "-Wl,--rpath='$$ORIGIN'");
 		 ac_set_var ("GCC_RPATH_PREFIX", "-Wl,--rpath=$(PREFIX)lib");
 	}
 
-	ac_check_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED");
-	if (ac_check_compiler_flag ("-mthreads", "GCC_MTHREADS") == 0) {
+	ac_has_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED");
+	if (ac_has_compiler_flag ("-mthreads", "GCC_MTHREADS")) {
 		 sbufcat (&aci_testing_flags, " -mthreads");
 	}
-	ac_check_compiler_flag ("-O2 -s", "GCC_O2");
-	ac_check_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
-	ac_check_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
-	ac_check_compiler_flag ("-ffast-math", "GCC_FASTMATH");
-	ac_check_compiler_flag ("-g", "GCC_G");
-	ac_check_compiler_flag ("-fstack-protector", "GCC_STACK_PROTECTOR");
+	ac_has_compiler_flag ("-O2 -s", "GCC_O2");
+	ac_has_compiler_flag ("-fomit-frame-pointer", "GCC_OMITFRAMEPOINTER");
+	ac_has_compiler_flag ("-ftree-vectorize", "GCC_TREEVECTORIZE");
+	ac_has_compiler_flag ("-ffast-math", "GCC_FASTMATH");
+	ac_has_compiler_flag ("-g", "GCC_G");
+	ac_has_compiler_flag ("-fstack-protector", "GCC_STACK_PROTECTOR");
 	// Fails on Woe
-//    ac_check_compiler_flag ("-ftrapv", "GCC_TRAPV");
-	ac_check_compiler_flag ("-fnon-call-exception", "GCC_NON_CALL_EXCEPTION");
+//    ac_has_compiler_flag ("-ftrapv", "GCC_TRAPV");
+	ac_has_compiler_flag ("-fnon-call-exception", "GCC_NON_CALL_EXCEPTION");
 
-	if (ac_check_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME") == 0) {
+	if (ac_has_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME")) {
 		ac_set_var ("GCC_SONAME", "-Wl,--soname=$(notdir $@)");
 	}
 
-	if (ac_check_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB") == 0) {
+	if (ac_has_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB")) {
 		ac_set_var ("GCC_OUTIMPLIB", "-Wl,--out-implib=$@$(A)");
 	}
 
@@ -5512,15 +5420,15 @@ void aci_check_clang_flags (int prefer_cxx)
 
 	if (aci_use_stdver) {
 		if (prefer_cxx) {
-			if (ac_check_compiler_flag ("-std=gnu++11", "GCC_STD") == 0) {
+			if (ac_has_compiler_flag ("-std=gnu++11", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++11");
-			} else if (ac_check_compiler_flag ("-std=gnu++0x", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu++0x", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu++0x");
 			}
 		} else {
-			if (ac_check_compiler_flag ("-std=gnu11", "GCC_STD") == 0) {
+			if (ac_has_compiler_flag ("-std=gnu11", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu11");
-			} else if (ac_check_compiler_flag ("-std=gnu99", "GCC_STD") == 0) {
+			} else if (ac_has_compiler_flag ("-std=gnu99", "GCC_STD")) {
 				sbufcat (&aci_testing_flags, " -std=gnu99");
 			}
 		}
@@ -5733,11 +5641,11 @@ void ac_init (const char *extension, int argc, char **argv, int latest_c_version
 		break;
 
 	case aci_cc_bcc32:
-		ac_check_compiler_flag ("-WD", "BCC_WD");
-		ac_check_compiler_flag ("-tWCR", "BCC_TWCR");
-		ac_check_compiler_flag ("-tWM", "BCC_TWM");
-		ac_check_compiler_flag ("-lGi", "BCC_LGI");
-		ac_check_compiler_flag ("-6", "TARGET_ARCH");
+		ac_has_compiler_flag ("-WD", "BCC_WD");
+		ac_has_compiler_flag ("-tWCR", "BCC_TWCR");
+		ac_has_compiler_flag ("-tWM", "BCC_TWM");
+		ac_has_compiler_flag ("-lGi", "BCC_LGI");
+		ac_has_compiler_flag ("-6", "TARGET_ARCH");
 
 		ac_add_var_append ("CFLAGS", "$(BCC_TWM) $(BCC_TWCR) -q");
 		ac_add_var_append ("SO_CFLAGS", "$(BCC_TWM) $(BCC_TWCR) -q");
@@ -5752,6 +5660,10 @@ void ac_init (const char *extension, int argc, char **argv, int latest_c_version
 	case aci_cc_clang:
 		aci_check_clang_flags (prefer_cxx);
 		break;
+
+	default:
+		/* We don't know which compiler we are using. Do nothing. */
+		;
 	}
 
 
@@ -5796,14 +5708,11 @@ void ac_init (const char *extension, int argc, char **argv, int latest_c_version
 /*    aci_check_werror (); */
 	aci_check_stdint ();
 	aci_check_endian_cross (use_dos_conventions ? ".obj" : ".o");
-#if 0
-	aci_check_imp_hack (use_dos_conventions ? ".obj" : ".o");
-#endif
 	aci_check_misc_once ();
 
 	int has_abiname = (aci_varlist_find(&aci_features, "ABINAME") != NULL);
 
-	if (ac_check_woe32()) {
+	if (ac_has_woe32()) {
 		ac_set_var ("SO", ".dll");
 		if (has_abiname) {
 			ac_set_var ("SOV", "-$(ABINAME)-$(SOMAJOR).dll");
@@ -6102,7 +6011,7 @@ static int aci_pkg_config_checked = 0;
 
 // Check for a function. If package config is available its information will
 // be used to deduce the required flags.
-int ac_check_func_pkg_config_tag (const char *includes,
+int ac_has_func_pkg_config_tag (const char *includes,
         const char *cflags, const char *func, const char *package,
         const char *tag)
 {
@@ -6122,7 +6031,7 @@ int ac_check_func_pkg_config_tag (const char *includes,
 		sbufinit (&sb);
 		sbufcpy (&sb, cflags ? cflags : "");
 		sbufcat (&sb, " ");    sbufcat (&sb, pcflags);
-		res = ac_check_func_lib_tag (includes, sbufchars (&sb), func, libs, 1, tag);
+		res = ac_has_func_lib_tag (includes, sbufchars (&sb), func, libs, 1, tag);
 
 		logfile = fopen ("configure.log", "a");
 		if (logfile) {
@@ -6135,7 +6044,7 @@ int ac_check_func_pkg_config_tag (const char *includes,
 		}
 		sbuffree (&sb);
 	} else {
-		res = ac_check_func_lib_tag (includes, cflags, func, package, 0, tag);
+		res = ac_has_func_lib_tag (includes, cflags, func, package, 0, tag);
 #if 0
 		if (res) {
 			aci_strlist_add (&aci_pkg_config_packs, package, 1);
@@ -6146,19 +6055,19 @@ int ac_check_func_pkg_config_tag (const char *includes,
 }
 
 
-int ac_check_func_pkg_config (const char *includes, const char *cflags,
+int ac_has_func_pkg_config (const char *includes, const char *cflags,
                     const char *func, const char *package)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, func);
-	return ac_check_func_pkg_config_tag (includes, cflags, func, package, tag);
+	return ac_has_func_pkg_config_tag (includes, cflags, func, package, tag);
 }
 
 
-int ac_check_member_pkg_config_tag (const char *includes, const char *cflags,
-                                    const char *func, const char *package,
-                                    const char *tag)
+int ac_has_member_pkg_config_tag (const char *includes, const char *cflags,
+                                  const char *func, const char *package,
+                                  const char *tag)
 {
 	int res = 0;
 	sbuf_t sb;
@@ -6176,8 +6085,8 @@ int ac_check_member_pkg_config_tag (const char *includes, const char *cflags,
 		sbufinit (&sb);
 		sbufcpy (&sb, cflags ? cflags : "");
 		sbufcat (&sb, " ");    sbufcat (&sb, pcflags);
-		res = ac_check_member_lib_tag (includes, sbufchars (&sb), func, libs, 1, tag);
-		
+		res = ac_has_member_lib_tag (includes, sbufchars (&sb), func, libs, 1, tag);
+
 		logfile = fopen ("configure.log", "a");
 		if (logfile) {
 			fprintf (logfile, "\nFound package %s in pkg-config: %d\n", package, res);
@@ -6187,8 +6096,8 @@ int ac_check_member_pkg_config_tag (const char *includes, const char *cflags,
 			aci_strlist_add (&aci_pkg_config_packs, package, 1);
 		}
 		sbuffree (&sb);
-	} else {
-		res = ac_check_member_lib_tag (includes, cflags, func, package, 0, tag);
+    } else {
+		res = ac_has_member_lib_tag (includes, cflags, func, package, 0, tag);
 #if 0
 		if (res) {
 			aci_strlist_add (&aci_pkg_config_packs, package, 1);
@@ -6199,13 +6108,13 @@ int ac_check_member_pkg_config_tag (const char *includes, const char *cflags,
 }
 
 
-int ac_check_member_pkg_config (const char *includes, const char *cflags,
-                                const char *func, const char *package)
+int ac_has_member_pkg_config (const char *includes, const char *cflags,
+                              const char *func, const char *package)
 {
 	char tag[BUFSIZE];
 
 	aci_identcopy (tag, sizeof tag, func);
-	return ac_check_member_pkg_config_tag (includes, cflags, func, package, tag);
+	return ac_has_member_pkg_config_tag (includes, cflags, func, package, tag);
 }
 
 

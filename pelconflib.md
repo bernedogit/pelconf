@@ -128,12 +128,12 @@ the *pelconf.c* file. Here is an example *pelconf.c* file
 		{
 	1       ac_init (".cpp", argc, argv, 1);
 
-	2       ac_check_headers ("unistd.h", NULL);
-	3       ac_check_func_lib ("sys/time.h", NULL, "gettimeofday", NULL);
+	2       ac_has_headers ("unistd.h", NULL);
+	3       ac_has_func_lib ("sys/time.h", NULL, "gettimeofday", NULL);
 
 			/* Clock_gettime could be in the standard library or in the extra rt library. */
-	4       ac_check_func_lib ("time.h", NULL, "clock_gettime", NULL) ||
-	5       ac_check_func_lib ("time.h", NULL, "clock_gettime", "rt");
+	4       ac_has_func_lib ("time.h", NULL, "clock_gettime", NULL) ||
+	5       ac_has_func_lib ("time.h", NULL, "clock_gettime", "rt");
 
 	6       ac_config_out ("config.h", "PELTK");
 	7       ac_edit_makefile ("makefile.in", "makefile");
@@ -221,8 +221,8 @@ for *pelconf.var* in several places:
 
 2. the current directory will be searched for the `pelconf.var` file.
 
-3. the program will attempt to use the file <install-prefix>/etc/pelconf.var,
-   where <install-prefix> is the installation prefix (by default /usr/local
+3. the program will attempt to use the file *<install-prefix>*`/etc/pelconf.var`,
+   where *<install-prefix>* is the installation prefix (by default `/usr/local`
    but can be set using the `--prefix=name` option).
 
 Using option 2 enables having project specific options. Using option 3
@@ -265,15 +265,15 @@ If this fails then try to compile manually and run the resulting program.
 5 Cross Compilation
 -------------------
 
-All tests in pelconflib.c do not require to run the generated code and can be used to 
-detect properties when using a cross compiler. In this case you need to have another 
-compiler that generates programs that will run in the compilation environment: 
+All tests in pelconflib.c do not require to run the generated code and can be used to
+detect properties when using a cross compiler. In this case you need to have another
+compiler that generates programs that will run in the compilation environment:
 
 	host-cc -o pelconf pelconf.c
 	./pelconf --cc=cross-cc
 
-Here host-cc is the compiler that generates binary files that can be executed in the 
-computer hosting the compilation environment. cross-cc is the compiler that will be 
+Here host-cc is the compiler that generates binary files that can be executed in the
+computer hosting the compilation environment. cross-cc is the compiler that will be
 checked.
 
 
@@ -282,8 +282,8 @@ checked.
 
 The *pelconflib.c* file provides the functionality to check the system. It
 contains many functions, some of them intended for internal use. Those
-functions that are intended for internal use have the aci_ prefix. The ones
-that are part of the public API use the prefix ac_. The rest of this
+functions that are intended for internal use have the `aci_` prefix. The ones
+that are part of the public API use the prefix `ac_`. The rest of this
 document describes the functions that are provided by *pelconflib.c*.
 
 7 Structure of *pelconf.c*
@@ -291,9 +291,9 @@ document describes the functions that are provided by *pelconflib.c*.
 
 You write the *pelconf.c* file. Every *pelconf.c* includes *pelconflib.c*
 first. The *pelconf.c* file has the `main()` function. `main()` always
-starts with the `aci_init()` function. This function performs argument
+starts with the `ac_init()` function. This function performs argument
 parsing and runs a series of tests that are always performed. After
-`aci_init()` follow the tests that are specific to this particular project:
+`ac_init()` follow the tests that are specific to this particular project:
 checking for headers, functions, etc. Then `main()` ends calling some
 functions to create the output. `ac_config_out()` writes the configuration*
 file which contains the results of the tests. `ac_edit_makefile()` creates
@@ -576,9 +576,9 @@ In some cases we need to know whether a header file is present. Note that
 the presence of a header file is a necessary condition but it may not be
 enough to ensure that the program will compile and link properly. You check
 for the presence of a set of headers as a single unit by using the function
-`ac_check_headers()` or `ac_check_headers_tag()`. For instance
+`ac_has_headers()` or `ac_has_headers_tag()`. For instance
 
-	ac_check_headers_tag ("sys/types.h, sys/stat.h", NULL, "STAT_HEADER");
+	ac_has_headers_tag ("sys/types.h, sys/stat.h", NULL, "STAT_HEADER");
 
 will check that after including first *<sys/types.h>* and then *<sys/stat.h>*
 we can compile an empty program. If both headers exist the HAVE_STAT_HEADER
@@ -586,7 +586,7 @@ macro will be defined. Note that according to the POSIX specification we
 must include *<sys/types.h>* before including *<sys/stat.h>*.
 
 The `ac_check_each_header_sequence()` will run each individual header through
-ac_check_headers(). This is different from above. Consider the call
+ac_has_headers(). This is different from above. Consider the call
 
 	ac_check_each_header_sequence ("sys/types.h, sys/stat.h", NULL);
 
@@ -605,30 +605,30 @@ Some times we need to check not only that a header file is available, but
 also that it declares a given function prototype. This may be enough to
 compile a source file that uses the declaration, but it may need further
 flags to specify the libraries containing the function. We check if a
-function declaration is available with the `ac_check_proto_tag()`,
-`ac_check_proto()` and `ac_check_signature()` functions. The
-`ac_check_proto()` and `ac_check_proto_tag()` functions check if a function
+function declaration is available with the `ac_has_proto_tag()`,
+`ac_has_proto()` and `ac_has_signature()` functions. The
+`ac_has_proto()` and `ac_has_proto_tag()` functions check if a function
 has been declared with the requested name. For instance:
 
-	ac_check_proto ("process.h", "-mthreads", "_beginthread");
+	ac_has_proto ("process.h", "-mthreads", "_beginthread");
 
 will check if the `_beginthread()` function has been declared after including
 *<process.h>* and compiled with the flag -mthreads. If it has been declared
 it will define the macro `HAVE__BEGINTHREAD`
 
-Note that the `ac_check_proto*()` functions do not care about how the
+Note that the `ac_has_proto*()` functions do not care about how the
 function has been declared, only that it has been declared. This may not be
 enough if we want to check for different possible declarations of the
 function. One example is the strerror_r function. It is defined by both
 POSIX and GNU in incompatible ways. If we use the proto functions above we
 may discover that strerror_r has been declared, but we do not know if it has
-been declared in the POSIX or GNU flavor. The `ac_check_signature()` can
+been declared in the POSIX or GNU flavor. The `ac_has_signature()` can
 distinguish both:
 
-	ac_check_signature ("string.h", NULL, "strerror_r",
+	ac_has_signature ("string.h", NULL, "strerror_r",
 	                    "int (*f)(int,char*,size_t)", "POSIX_STRERROR_R");
 
-	ac_check_signature ("string.h", NULL, "strerror_r",
+	ac_has_signature ("string.h", NULL, "strerror_r",
 	                    "char* (*f)(int,char*,size_t)", "GNU_STRERROR_R");
 
 Here we define `HAVE_POSIX_STRERROR_R` if *strerror_r* has been declared as
@@ -647,10 +647,10 @@ only the call through an incompatible pointer type being undefined behaviour.
 ----------------------------------
 
 Often we need to verify that a type is available after including some
-headers. This is done with the `ac_check_type()` and `ac_check_type_tag()`
+headers. This is done with the `ac_has_type()` and `ac_has_type_tag()`
 functions. For instance:
 
-	ac_check_type ("sys/time.h", NULL, "struct timeval");
+	ac_has_type ("sys/time.h", NULL, "struct timeval");
 
 This will check if the struct timeval is available after including
 *<sys/time.h>*. If it is available `HAVE_STRUCT_TIMEVAL` will be defined.
@@ -665,8 +665,8 @@ may need to check if it contains a given member. For instance, the `struct
 lconv` contains the field `int_p_cs_precedes` in C99 but not in C90. We can
 check for this field with
 
-	ac_check_member_tag ("locale.h", NULL, "struct lconv","int_p_cs_precedes",
-	                     "C99_LCONV");
+	ac_has_member_tag ("locale.h", NULL, "struct lconv","int_p_cs_precedes",
+	                   "C99_LCONV");
 
 If the field is present `HAVE_C99_LCONV` will be defined.
 
@@ -676,11 +676,11 @@ If the field is present `HAVE_C99_LCONV` will be defined.
 
 In some cases we need to know the size of a given type. We could use
 sizeof() at run time but in some cases we need to know the size at compile
-time. `ac_check_sizeof()` can figure out the size of a type without running
+time. `ac_get_sizeof()` can figure out the size of a type without running
 any program. Thus it is usable even when cross-compiling. The following can
 be used to figure out the size of a `wchar_t`:
 
-	size_t n = ac_check_sizeof ("stddef.h", NULL, "wchar_t");
+	size_t n = ac_get_sizeof ("stddef.h", NULL, "wchar_t");
 
 The test above will return the `sizeof(wchar_t)` and will define the macro
 `SIZEOF_WCHAR_T` to the size of `wchar_t`.
@@ -690,7 +690,7 @@ The test above will return the `sizeof(wchar_t)` and will define the macro
 -------------------------------
 
 Any program may check for the presence of macros by using #ifdef. The test
-`ac_check_define()` allows the configuration program to verify if a given
+`ac_has_define()` allows the configuration program to verify if a given
 macro is defined. It may then modify the makefile accordingly or run
 additional tests.
 
@@ -699,7 +699,7 @@ additional tests.
 -----------------------------------------
 
 We may need in some cases to check if a given expression is valid in the
-preprocessor. Use the `ac_check_cpp_expression()` function for this purpose.
+preprocessor. Use the `ac_valid_cpp_expression()` function for this purpose.
 
 
 
@@ -708,11 +708,11 @@ preprocessor. Use the `ac_check_cpp_expression()` function for this purpose.
 
 The tests above can be seen as specialized versions of a general check to
 verify that some source code can compile. We can check if an arbitrary
-source code compiles or fails to compile with the `ac_check_compile()` and
-`ac_check_compile_fail()` functions. For instance, we can quickly check if a
+source code compiles or fails to compile with the `ac_does_compile()` and
+`ac_does_compile_fail()` functions. For instance, we can quickly check if a
 given set of flags is defined by using the following check:
 
-	ac_check_compile ("has fcntl.h flags",
+	ac_does_compile ("has fcntl.h flags",
 	              "#include <fcntl.h>\n"
 				  "int x = O_CREAT | O_EXCL | O_TRUNC | O_APPEND | O_RDONLY | O_WRONLY;\n",
 				  NULL, "FCNTL_FLAGS");
@@ -723,7 +723,7 @@ after including *<fcntl.h>* the `O_CREAT`, `O_EXCL`, `O_TRUNC`, `O_APPEND`,
 HAVE_FCNTL_FLAGS will be defined.
 
 In some cases we are checking for bugs in the compilation environment. In
-this case we use `ac_check_compile_fail()`. If the given source code fails to
+this case we use `ac_does_compile_fail()`. If the given source code fails to
 compile it will define the macro. This may be used to work around bugs.
 
 
@@ -744,8 +744,8 @@ the compilation and linking steps succeed.
 ----------------------------------------------------
 
 We need to check that functions are not only declared but that they are also
-present in the libraries. The functions `ac_check_func_lib()` and
-`ac_check_func_lib_tag()` perform the compilation and linking steps to verify
+present in the libraries. The functions `ac_has_func_lib()` and
+`ac_has_func_lib_tag()` perform the compilation and linking steps to verify
 that a function can be used. For instance the function `clock_gettime()` is
 usually declared in *<time.h>* but it may be available in the default library
 or we may need to link it explicitely with the *rt* library. The following
@@ -753,8 +753,8 @@ tests check that the `clock_gettime` is declared in *<time.h>* and then
 first if it is available in the default library and if it is not available
 in the default library it checks if it is available in the *rt* library.
 
-	ac_check_func_lib ("time.h", NULL, "clock_gettime", NULL) ||
-	ac_check_func_lib ("time.h", NULL, "clock_gettime", "rt")
+	ac_has_func_lib ("time.h", NULL, "clock_gettime", NULL) ||
+	ac_has_func_lib ("time.h", NULL, "clock_gettime", "rt")
 
 If it turns out that the *rt* library is required, the name of the required
 library will be added to the makefile variable EXTRALIBS.
@@ -764,14 +764,14 @@ library will be added to the makefile variable EXTRALIBS.
 10.2 General testing of the linking environment
 ----------------------------------------------
 
-Similar to `ac_check_compile()` you can check if a given source code compiles
+Similar to `ac_does_compile()` you can check if a given source code compiles
 and links using some given flags. For an example of the need for this
 function consider GCC's atomic builtin functions. GCC supports the function
 `__sync_fetch_and_add()` as an intrinsic function. However if the
 architecture does not support the atomic fetch-and-add GCC will generate a
 library call.
 
-	ac_check_link ("has __sync_fetch_and_add builtin",
+	ac_does_compile_and_link ("has __sync_fetch_and_add builtin",
 	        "int main()  { int x = 5;  return  __sync_fetch_and_add(&x, 2); }\n",
 	        "", NULL, "SYNC_FETCH_AND_ADD");
 
@@ -785,7 +785,7 @@ If we compile this with *gcc -march=i386* the program will not link because
 11 Miscelaneous tests
 --------------------
 
-`ac_check_file()` can be used to verify if a given file is present in the
+`ac_has_file()` can be used to verify if a given file is present in the
 compilation environment. Note that the file may not be present in the
 execution environent.
 
@@ -793,30 +793,6 @@ execution environent.
 
 12 Reference
 ------------
-
-### ac_init
-
-	void ac_init (const char *extension, int argc, char **argv,
-	              int latest_c_version);
-
-This is the first function that *pelconf.c* should call. Extension is the
-extension used for the file that will contain the source code to be tested.
-Use ".c" for C files. Any other extensions will be treated as C++. The
-recomended extension for C++ files which is understood by most compilers is
-".cpp". argc and argv are just the arguments passed by the user. Set
-latest_c_version if you want to check for features of the latest C or C++
-standards. If latest_c_version is 0 it will not check for the latest
-standards. On GCC if *latest_c_version* is true then it will also select the
-appropriate flag like *-std=gnu++14*
-
-
-
-### ac_finish
-
-	void ac_finish (void);
-
-This is the last function that pelconf.c should call. It performs the
-required clean up tasks.
 
 
 ### ac_add_code
@@ -830,76 +806,50 @@ output code if the feature is not available. The code would then emulate
 the feature.
 
 
-### ac_set_var
+### ac_add_flag
 
-	void ac_set_var (const char *name, const char *value);
+	void ac_add_flag (const char *name, const char *comment, int passed)
 
-Sets the makefile variable whose name is *name to the value stored in
-*value.
+The public interface to add a preprocessor define to the configuration file 
+`config.h`. Name is the name of the flag. The comment will be displayed
+before the flag. The flag will be #defined if passed is true.
 
 
-### ac_add_var_prepend
+### ac_add_option_info
 
-	void ac_add_var_prepend (const char *name, const char *value);
+	void ac_add_option_info (const char *opt, const char *desc)
 
-Prepends *value to the current value of the makefile variable *name. If
-this function is called several times, the last value prepended will be
-found at the beginning.
+Add the description of one command line option. This information will be
+shown to the user when the `ac_show_help()` function is called or when the
+user gives the "--help" option. Call this function for each of the options
+that the configuration program processes. `opt` is the command line option
+that is being described and desc is the text explaining it.
 
 
 ### ac_add_var_append
 
 	void ac_add_var_append (const char *name, const char *value);
 
-Appends *value to the current value of the makefile variable *name. If  this
-function is called several times, the last value appended will be  found at
-the end of *name's value.
+Append text to a variable in the makefile. Appends *value to the current
+value of the makefile variable *name. If this function is called several
+times, the last value appended will be found at the end of *name's value.
 
 
-### ac_add_flag
+### ac_add_var_prepend
 
-	void ac_add_flag (const char *name, const char *comment, int passed)
+	void ac_add_var_prepend (const char *name, const char *value);
 
-The public interface to add a flag to the configuration file. Name is the
-name of the flag. The comment will be displayed before the flag. The flag
-will be #defined if passed is true.
-
-
-### ac_msg_error
-
-	int ac_msg_error (const char *msg);
-
-It will output an error message and stop the configuration.
+Prepend text to a variable in the makefile. Prepends *value to the current
+value of the makefile variable *name. If this function is called several
+times, the last value prepended will be found at the beginning.
 
 
-### ac_check_headers_tag
+### ac_check_each_func
 
-	int ac_check_headers_tag (const char *includes, const char *cflags,
-	                          const char *tag);
+	void ac_check_each_func (const char *funcs, const char *cflags)
 
-Checks for the presence of the headers listed in includes, when compiled
-with the compilation flags given in *cflags*. If all the header files could
-be included then it will define the preprocessor macro HAVE_<*tag*> in the
-configuration file. You may write several headers in *includes* by
-separating them with commas. For instance you may want to check if the
-headers *<sys/types.h>* and *<sys/stat.h>* are available:
-
-	ac_check_headers_tag ("sys/types.h, sys/stat.h", "", "SYS_TYPES_STAT");
-
-This will define `HAVE_SYS_TYPES_STAT` in the configuration file if the
-headers are available.
-
-The function returns nonzero if the headers are available. If the headers
-are available and *cflags* is not NULL or empty it will add its contents to
-the `EXTRA_CFLAGS` makefile variable.
-
-
-### ac_check_headers
-
-	int ac_check_headers (const char *includes, const char *cflags);
-
-Same as `ac_check_headers_tag()`, but the tag name is deduced from the name
-of the headers.
+Check for the presence of each function in *funcs*. Use it after
+`ac_check_each_header_sequence()`.
 
 
 ### ac_check_each_header_sequence
@@ -908,71 +858,188 @@ of the headers.
 	                                    const char *cflags);
 
 This will check for each header file in *includes*, behaving as if
-`ac_check_headers()` was called with each of the header files individually.
+`ac_has_headers()` was called with each of the header files individually.
 
 
-### ac_check_proto_tag
+### ac_check_same_cxx_types
 
-	int ac_check_proto_tag (const char *includes, const char *cflags,
-	                        const char *func, const char *tag);
+	void ac_check_same_cxx_types (const char *includes, const char *cflags,
+	                              const char *t1, const char *t2, const char *tag)
 
-Checks if the prototype for the function func is defined in the headers
-listed in includes when compiled with the compilation flags cflags. If it is
-available it will add HAVE_<*tag*> to the configuration file and return a
-non-zero value. If the prototype is found and *cflags* is neither NULL nor
-empty it will add its contents to the `EXTRA_CFLAGS` variable in the
-makefile.
-
-For instance:
-
-	ac_check_proto_tag ("stdio.h", "-ansi", "fopen",
-	                    "FOPEN_IN_STDIO_WITH_ANSI");
-
-This will check if fopen() is defined in stdio.h when compiled with the
--ansi flag. If it is it will define `HAVE_FOPEN_IN_STDIO_WITH_ANSI`.
+Include the files listed in *includes* and compile with the compilation
+flags *cflags*. Are the typedefed types *t1* and *t2* the same types in C++?
+If yes then define *tag* in the configuration file.
 
 
-### ac_check_proto
+### ac_config_out
 
-	int ac_check_proto (const char *includes, const char *cflags,
-	                    const char *func);
+	void ac_config_out (const char *config_name, const char *feature_pfx)
 
-Same as calling ac_check_proto_tag() but with the tag deduced from the
-function name. For instance:
-
-	ac_check_proto ("stdio.h", "-ansi", "fopen);
-
-will define `HAVE_FOPEN` if fopen is defined when including *stdio.h* and
-compiling with the compiler option -ansi.
+Write out the configuration file to *config_name*. Prefix the configuration
+macros with *feature_pfx*.
 
 
-### ac_check_signature
+### ac_create_pc_file
 
-	int ac_check_signature (const char *includes, const char *cflags,
-	                        const char *func, const char *signature,
-	                        const char *tag);
+	void ac_create_pc_file (const char *libname, const char *desc)
 
-Checks if the header files listed in includes, when compiled with cflags
-define the function func with the signature given in signature. If it does
-it adds HAVE_<*tag*> to the configuration file and returns non-zero. If  the 
-signature is found and *cflags* is neither NULL nor empty it will add  its 
-contents to the EXTRA_CFLAGS variable in the makefile. For instance:
+Create a .pc file for pkg-config. *libname* is the name of the library. You
+provide the one line description of the library in *desc*.
 
-	ac_check_signature ("string.h", NULL, "strerror_r", "int (*f)(int,char*,size_t)",
-	        "POSIX_STRERROR_R");
 
-	ac_check_signature ("string.h", NULL, "strerror_r", "char* (*f)(int,char*,size_t)",
-	        "GNU_STRERROR_R");
 
-Both GNU and POSIX define strerror_r but differ in the signature. The  above
-checks will detect if we have the POSIX or GNU version. The  signature must
-be written as a declaration of a function pointer with the  desired
-signature.
+### ac_does_compile
 
-			
-### ac_check_func_lib_tag
+	int ac_does_compile (const char *comment, const char *src,
+	                     const char *cflags, const char *tag);
 
-	int ac_check_func_lib_tag (const char *includes, const char *cflags,
+Check if we can compile the source code in *src*, using the compilation flags
+in *cflags*. The comment *comment* will be put in the configuration file
+before the definition of the tag *tag*. If the code compiles it returns true
+and defines the tag in the configuration file. If the code does not compile
+the definition is left as a comment and the function returns zero.
+
+
+### ac_does_compile_and_link
+
+	int ac_does_compile_and_link (const char *comment, const char *src,
+	              const char *flags, const char *libs, const char *tag);
+
+Check if we can compile and link the source code in *src*, using the
+compilation flags in *cflags* and linking with the libraries in *libs*. The
+comment *comment* will be put in the configuration file before the definition
+of the tag *tag*. If the compilationg and linking is successful it will
+return non zero. If something fails zero will be returned.
+
+
+
+### ac_does_compile_and_link_fail
+
+	int ac_does_compile_and_link_fail (const char *comment, const char *src,
+	              const char *flags, const char *libs, const char *tag);
+
+Perform the same check as `ac_does_compile_and_link()` but set the flags and
+return value only if the compilation fails.
+
+
+### ac_does_compile_fail
+
+	int ac_does_compile_fail (const char *comment, const char *src,
+	                           const char *cflags, const char *tag);
+
+Similar to `ac_does_compile()`, but define the tag only if the compilation
+fails. It returns zero if the source code compiles and non zero if the
+compilation fails.
+
+
+### ac_edit_makefile
+
+	void ac_edit_makefile (const char *make_in, const char *make_out)
+
+Write the completed makefile reading it from *make_in* and putting it in
+*make_out*.
+
+### ac_finish
+
+	void ac_finish (void);
+
+This is the last function that pelconf.c should call. It performs the
+required clean up tasks.
+
+
+
+### ac_get_sizeof
+
+	int ac_get_sizeof (const char *includes, const char *cflags,
+	                     const char *tname);
+
+Detects the size of a type without actually running the compiler program
+(may be useful for cross compilers). It will include the files listed in
+*includes* and it will use the compilation flags *cflags*. A macro of the
+form SIZEOF_##*tname* will be defined in the configuration file. The
+function  returns -1 on failure or the `sizeof(tname)` on success.
+
+
+### ac_has_compiler_flag
+
+	int ac_has_compiler_flag (const char *flag, const char *makevar)
+
+See if the compiler supports the compilation flag *flag*. If it does set the
+makefile variable *makevar* to *flag*. It returns true if the flag is
+accepted by the compiler.
+
+
+### ac_has_define
+
+	int ac_has_define (const char *includes, const char *cflags,
+	                     const char *defname);
+
+Return true if *defname* has been defined as a macro after including the
+files listed in *includes* and compiling with the compilation flags *cflags*.
+
+
+### ac_has_feature
+
+	int ac_has_feature (const char *name, char *dest, size_t dest_size)
+
+Check if the option *name* was given in the command line and put its value
+in  *dest*.
+
+
+### ac_has_file
+
+	int ac_has_file (const char *name);
+
+Check if the file *name* is available in the **compilation** environment.
+
+
+### ac_has_func_attribute
+
+	int ac_has_func_attribute (const char *attribute, const char *external,
+	                             int usedef, int literal);
+
+Check if the attribute *attribute* is a valid attribute for functions. If
+usedef is not zero a default definition will be added to the function. This
+is sometimes required when an attribute is allowed only with function
+definitions but not with function declarations. If literal is zero then
+check if the attribute is available in the form __attribute__ before
+checking the name of the attribute without underscores. If defines a macro
+with the name *external* to the correct syntax for the attribute. It returns
+non zero if the attribute is available.
+
+
+
+### ac_has_func_lib
+
+	int ac_has_func_lib (const char *includes, const char *cflags,
+	                       const char *func, const char *libs, int verbatim);
+
+Same as `ac_has_func_lib_tag()` but the tag name is deduced from the name of
+the function. For instance we may want to check how to compile under Win32 
+when using threads:
+
+	ac_has_func_lib ("process.h", NULL, "_beginthread", NULL) ||
+	ac_has_func_lib ("process.h", "-tWM", "_beginthread", NULL) ||
+	ac_has_func_lib ("process.h", "-mthreads", "_beginthread", NULL);
+
+This will define `HAVE__BEGINTHREAD` in the configuration file if one of
+the above tests compiles and links. In addition `EXTRA_CFLAGS` will get the
+compiler option that is required for multithreaded compilation under
+windows.
+
+
+### ac_has_func_lib_cxx
+
+	int ac_has_func_lib_cxx (const char *includes, const char *cflags,
+	                           const char *func, const char *libs)
+
+Same as `ac_has_func_lib_cxx_tag()` but the tag name is deduced from the name
+of the function.
+
+
+### ac_has_func_lib_tag
+
+	int ac_has_func_lib_tag (const char *includes, const char *cflags,
 	                           const char *func, const char *libs,
 	                           int verbatim, const char *tag);
 
@@ -986,11 +1053,11 @@ Otherwise the *libs* contents are processed to add the required prefixes and
 suffixes as required to convert `foo bar` into `-lfoo -lbar` or `foo.lib
 bar.lib` as needed.
 
-If the function is found the contents of cflags will be added to the 
+If the function is found the contents of cflags will be added to the
 variable `EXTRA_CFLAGS` in the makefile and the additional libraries are
 added to the `EXTRALIBS` variable in the makefile. For instance:
 
-	ac_check_func_lib_tag ("pthread.h", NULL, "clock_gettime", "pthread",
+	ac_has_func_lib_tag ("pthread.h", NULL, "clock_gettime", "pthread",
 	                       "CLOCK_GETTIME_IN_PTHREAD");
 
 If found, this will define `HAVE_CLOCK_GETTIME_IN_PTHREAD` in the
@@ -998,64 +1065,84 @@ configuration file and it will add `-lpthread` to the `EXTRALIBS` variable
 in the makefile.
 
 
-### ac_check_func_lib
+### ac_has_func_lib_tag_cxx
 
-	int ac_check_func_lib (const char *includes, const char *cflags,
-	                       const char *func, const char *libs, int verbatim);
-
-Same as above but the tag name is deduced from the name of the function.
-For instance we may want to check how to compile under Win32 when using
-threads:
-
-	ac_check_func_lib ("process.h", NULL, "_beginthread", NULL) ||
-	ac_check_func_lib ("process.h", "-tWM", "_beginthread", NULL) ||
-	ac_check_func_lib ("process.h", "-mthreads", "_beginthread", NULL);
-
-This will define `HAVE__BEGINTHREAD` in the configuration file if one of
-the above tests compiles and links. In addition `EXTRA_CFLAGS` will get the
-compiler option that is required for multithreaded compilation under 
-windows.
-
-
-### ac_check_func_lib_tag_cxx
-
-	int ac_check_func_lib_tag_cxx (const char *includes, const char *cflags,
+	int ac_has_func_lib_tag_cxx (const char *includes, const char *cflags,
 	                    const char *func, const char *libs, const char *tag);
 
-Similar to `ac_check_func_lib_tag()`. The difference is that this function
+Similar to `ac_has_func_lib_tag()`. The difference is that this function
 assumes that the compiler is a C++ compiler and that the included files must
 be wrapped with `extern "C" {}` within **our** program.
 
 
-### ac_check_func_lib_cxx
+### ac_has_func_pkg_config
 
-	int ac_check_func_lib_cxx (const char *includes, const char *cflags,
-	                           const char *func, const char *libs)
+	int ac_has_func_pkg_config (const char *includes, const char *cflags,
+	                const char *func, const char *package)
 
-Same as above but the tag name is deduced from the name of the function.
-
-
-### ac_check_member_lib_tag
-
-int ac_check_member_lib_tag (const char *includes, const char *cflags,
-                             const char *func, const char *libs,
-                             int verbatim, const char *tag)
-
-This function checks the the member function specified in func is present
-after including the headers listed in *includes*, compiling with *cflags*
-and linking with *libs*. It assumes that the compiler is a C++ compiler.
+Same as `ac_has_func_pkg_config_tag()` but the tag is deduced from func.
 
 
-### ac_check_member_lib
+### ac_has_func_pkg_config_tag
 
-	int ac_check_member_lib (const char *includes, const char *cflags,
-	                         const char *func, const char *libs,
-	                         int verbatim)
+	int ac_has_func_pkg_config_tag (const char *includes,
+	          const char *cflags, const char *func, const char *package,
+	          const char *tag)
 
-Same as above but the tag name is deduced from the name of the function.
-For instance:
+Check for a function. If package config is available its information will
+be used to deduce the required flags. Otherwise check if the function is in
+the library *package*. It returns true if the function was found.
 
-	ac_check_member_lib ("peltk/formats/exif.hpp", NULL,
+
+### ac_has_headers
+
+	int ac_has_headers (const char *includes, const char *cflags);
+
+Same as `ac_has_headers_tag()`, but the tag name is deduced from the name
+of the headers.
+
+
+### ac_has_headers_tag
+
+	int ac_has_headers_tag (const char *includes, const char *cflags,
+	                        const char *tag);
+
+Checks for the presence of the headers listed in includes, when compiled
+with the compilation flags given in *cflags*. If all the header files could
+be included then it will define the preprocessor macro HAVE_<*tag*> in the
+configuration file. You may write several headers in *includes* by
+separating them with commas. For instance you may want to check if the
+headers *<sys/types.h>* and *<sys/stat.h>* are available:
+
+	ac_has_headers_tag ("sys/types.h, sys/stat.h", "", "SYS_TYPES_STAT");
+
+This will define `HAVE_SYS_TYPES_STAT` in the configuration file if the
+headers are available.
+
+The function returns nonzero if the headers are available. If the headers
+are available and *cflags* is not NULL or empty it will add its contents to
+the `EXTRA_CFLAGS` makefile variable.
+
+
+### ac_has_member
+
+	int ac_has_member (const char *includes, const char *cflags,
+	        const char *sname, const char *fname);
+
+Same as `ac_has_member_tag()` but the tag is deduced from the name of the
+field.
+
+
+### ac_has_member_lib
+
+	int ac_has_member_lib (const char *includes, const char *cflags,
+	                       const char *func, const char *libs,
+	                       int verbatim)
+
+Same as `ac_has_member_lig_tag()` but the tag name is deduced from the name
+of the function. For instance:
+
+	ac_has_member_lib ("peltk/formats/exif.hpp", NULL,
 	        "peltk::formats::Exif_reader::get_metering", "peltk-formats");
 
 This checks if the member function
@@ -1065,295 +1152,34 @@ with the library *peltk-formats*. If the `get_metering()` function is found
 then it `#defines HAVE_PELTK__FORMATS__EXIF_READER__GET_METERING`.
 
 
-### ac_check_member_tag
+### ac_has_member_lib_tag
 
-	int ac_check_member_tag (const char *includes, const char *cflags,
-	        const char *sname, const char *fname, const char *tag);
+	int ac_has_member_lib_tag (const char *includes, const char *cflags,
+	                           const char *func, const char *libs,
+	                           int verbatim, const char *tag)
 
-After adding the *includes* files anc compiling with *cflags* check if the
-structure *sname* contains a member with the name *fname*. If it does the
-define *tag* and return 1.
+This function checks the the member function specified in func is present
+after including the headers listed in *includes*, compiling with *cflags*
+and linking with *libs*. It assumes that the compiler is a C++ compiler.
 
 
-### ac_check_member
+### ac_has_member_pkg_config
 
-	int ac_check_member (const char *includes, const char *cflags,
-	        const char *sname, const char *fname);
+	int ac_has_member_pkg_config (const char *includes, const char *cflags,
+	                                const char *func, const char *package)
 
-Same as above but the tag is deduced from the name of the field.
+Same as `ac_has_member_pkg_config_tag()` but the tag is deduced from func.
 
 
-### ac_check_type_tag
 
-	int ac_check_type_tag (const char *includes, const char *cflags,
-	                       const char *tname, const char *tag);
+### ac_has_member_pkg_config_tag
 
-Check if *tname* is available as the name of a type after including the
-files listed in *includes* and compiling with the compilation flags
-*cflags*. If *tname* is available then define tag in the configuration file
-and return 1.
-
-
-### ac_check_type
-
-	int ac_check_type (const char *includes, const char *cflags,
-	                   const char *tname);
-
-Same as above but the tag is deduced from the name of the type.
-
-
-### ac_check_compile
-
-	int ac_check_compile (const char *comment, const char *src,
-	                      const char *cflags, const char *tag);
-
-Check if we can compile the source code in *src*, using the compilation
-flags in *cflags*. The comment *comment* will be put in the configuration
-file before the definition of the tag *tag*. If the code compiles it returns
-true.
-
-
-### ac_check_compile_fail
-
-	int ac_check_compile_fail (const char *comment, const char *src,
-	                           const char *cflags, const char *tag);
-
-Same as `ac_check_compile()`, but define the tag only if the compilation
-fails.
-
-
-### ac_check_link
-
-	int ac_check_link (const char *comment, const char *src,
-	                   const char *flags, const char *libs, const char *tag);
-
-Check if we can compile and link the source code in *src*, using the
-compilation flags in *cflags* and linking with the libraries in *libs*. The
-comment *comment* will be put in the configuration file before the 
-definition of the tag *tag*.
-
-
-### ac_check_file
-
-	int ac_check_file (const char *name);
-
-Check if the file *name* is available in the **compilation** environment.
-
-
-### ac_check_sizeof
-
-	int ac_check_sizeof (const char *includes, const char *cflags,
-	                     const char *tname);
-
-Detects the size of a type without actually running the compiler program
-(may be useful for cross compilers). It will include the files listed in
-*includes* and it will use the compilation flags *cflags*. A macro of the
-form SIZEOF_##*tname* will be defined in the configuration file. The
-function  returns -1 on failure or the `sizeof(tname)` on success.
-
-
-### ac_check_define
-
-	int ac_check_define (const char *includes, const char *cflags,
-	                     const char *defname);
-
-Return true if *defname* has been defined as a macro after including the
-files listed in *includes* and compiling with the compilation flags *cflags*.
-
-
-### ac_check_cpp_expression
-
-	int ac_check_cpp_expression (const char *includes, const char *cflags,
-	                             const char *expr)
-
-Check if the expression *expr* is a valid preprocessor expression after
-including the files listed in *includes* and compiling with the compilation
-flags *cflags*.
-
-
-### ac_check_woe32
-
-	int ac_check_woe32 (void)
-
-Are we compiling for Woe?
-
-
-### ac_check_var_attribute
-
-	int ac_check_var_attribute (const char *attribute, const char *external);
-
-Check if the attribute *attribute* is a valid attribute for variables. The
-macro *external* will be defined to the syntax required for the attribute.
-
-
-### ac_check_func_attribute
-
-	int ac_check_func_attribute (const char *attribute, const char *external,
-	                             int usedef, int literal);
-
-Check if the attribute *attribute* is a valid attribute for functions. If
-usedef is not zero a default definition will be added to the function. This 
-is sometimes required when an attribute is allowed only with function
-definitions but not with function declarations. If literal is zero then 
-check if the attribute is available in the form __attribute__ before
-checking the name of the attribute without underscores. If defines a macro
-with the name *external* to the correct syntax for the attribute. It returns 
-non zero if the attribute is available.
-
-
-
-### ac_check_compiler_flag
-
-	int ac_check_compiler_flag (const char *flag, const char *makevar)
-
-See if the compiler supports the compilation flag *flag*. If it does set the
-makefile variable *makevar* to *flag*.
-
-
-### ac_check_same_cxx_types
-
-	void ac_check_same_cxx_types (const char *includes, const char *cflags,
-	                              const char *t1, const char *t2, const char *tag)
-
-Include the files listed in *includes* and compile with the compilation
-flags *cflags*. Are the typedefed types *t1* and *t2* the same types in C++?
-If yes then define *tag* in the configuration file.
-
-
-### ac_libobj
-
-	void ac_libobj (const char *func_name)
-
-Add *func_name.o* to the list of object files that must be compiled. This
-list is available as the value of the makefile variable `LIBOBJS`. It will
-usually be the list of files which provide replacements for missing
-functions.
-
-
-### ac_replace_funcs
-
-	void ac_replace_funcs (const char *includes, const char *cflags, const char *funcs)
-
-After including the files listed in *includes* and compiling with the
-compilation flags *cflags* check for the presence of each of the functions 
-listed in *funcs*. If the function is not available the add the object file 
-*function_name.o* to the makefile variable *LIBOBJS*.
-
-
-### ac_check_each_func
-
-	void ac_check_each_func (const char *funcs, const char *cflags)
-
-Check for the presence of each function in *funcs*. Use it after
-`ac_check_each_header_sequence()`.
-
-
-### ac_show_help
-
-	void ac_show_help (void)
-
-Show the available options for the configuration program.
-
-
-### ac_add_option_info
-
-	void ac_add_option_info (const char *opt, const char *desc)
-
-Add the description of one option. This information will be shown to the
-user when the `ac_show_help()` function is called or when the user gives the
-"--help" option. Call this function for each of the options that the
-configuration program processes.
-
-
-### ac_have_feature
-
-	ptrdiff_t ac_have_feature (const char *name, char *dest, size_t dest_size)
-
-Check if the option *name* was given in the command line and put its value
-in  *dest*.
-
-
-### ac_use_macro_prefix
-
-	void ac_use_macro_prefix (const char *pfx)
-
-Prepend the prefix *pfx* to the macros created by the program.
-
-
-### ac_config_out
-
-	void ac_config_out (const char *config_name, const char *feature_pfx)
-
-Write out the configuration file to *config_name*. Prefix the configuration 
-macros with *feature_pfx*.
-
-
-### ac_edit_makefile
-
-	void ac_edit_makefile (const char *make_in, const char *make_out)
-
-Write the completed makefile reading it from *make_in* and putting it in
-*make_out*.
-
-
-### ac_create_pc_file
-
-	void ac_create_pc_file (const char *libname, const char *desc)
-
-Create a .pc file for pkg-config. *libname* is the name of the library. You
-provide the one line description of the library in *desc*.
-
-
-### ac_finish
-
-	void ac_finish (void)
-
-Clean up all the used resources.
-
-
-### ac_has_pkg_config
-
-	int ac_has_pkg_config (void)
-
-See if pkg-config is installed and working.
-
-
-### ac_pkg_config_flags
-
-	int ac_pkg_config_flags (const char *s, char *buf, size_t n, pkgconf_flags what)
-
-Get the flags as given by pkg-config. *what* can be `pkgconf_cflags` or
-`pkgconf_libs`. Store the flags in the buffer *buf* of size *n*.
-
-
-
-### ac_check_func_pkg_config_tag
-
-	int ac_check_func_pkg_config_tag (const char *includes,
-	          const char *cflags, const char *func, const char *package,
-	          const char *tag)
-
-Check for a function. If package config is available its information will
-be used to deduce the required flags. Otherwise check if the function is in
-the library *package*.
-
-
-### ac_check_func_pkg_config
-
-	int ac_check_func_pkg_config (const char *includes, const char *cflags,
-	                const char *func, const char *package)
-
-Same as above but the tag is deduced from func.
-
-
-### ac_check_member_pkg_config_tag
-
-	int ac_check_member_pkg_config_tag (const char *includes, const char *cflags,
+	int ac_has_member_pkg_config_tag (const char *includes, const char *cflags,
 	                                    const char *func, const char *package,
 	                                    const char *tag)
 
-Similar to `ac_check_member_lib_tag()` but it first uses pkg-config if
-available and if this fails it uses `ac_check_member_lib_tag()`.
+Similar to `ac_has_member_lib_tag()` but it first uses pkg-config if
+available and if this fails it uses `ac_has_member_lib_tag()`.
 
 Pkg-config is needed on ELF systems when linking with static libraries. For
 instance library A needs library B. If the library A is a static library it
@@ -1375,11 +1201,202 @@ required only due to inline references and are not part of the API. This is
 why Woe needs pkg-config for all libraries.
 
 
-### ac_check_member_pkg_config
+### ac_has_member_tag
 
-	int ac_check_member_pkg_config (const char *includes, const char *cflags,
-	                                const char *func, const char *package)
+	int ac_has_member_tag (const char *includes, const char *cflags,
+	        const char *sname, const char *fname, const char *tag);
 
-Same as above but the tag is deduced from func.
+After adding the *includes* files anc compiling with *cflags* check if the
+structure *sname* contains a member with the name *fname*. If it does the
+define *tag* and return 1.
+
+
+### ac_has_pkg_config
+
+	int ac_has_pkg_config (void)
+
+See if pkg-config is installed and working.
+
+
+### ac_has_proto
+
+	int ac_has_proto (const char *includes, const char *cflags,
+	                    const char *func);
+
+Same as calling `ac_has_proto_tag()` but with the tag deduced from the
+function name. For instance:
+
+	ac_has_proto ("stdio.h", "-ansi", "fopen);
+
+will define `HAVE_FOPEN` if fopen is defined when including *stdio.h* and
+compiling with the compiler option -ansi.
+
+
+### ac_has_proto_tag
+
+	int ac_has_proto_tag (const char *includes, const char *cflags,
+	                        const char *func, const char *tag);
+
+Checks if the prototype for the function func is defined in the headers
+listed in includes when compiled with the compilation flags cflags. If it is
+available it will add HAVE_<*tag*> to the configuration file and return a
+non-zero value. If the prototype is found and *cflags* is neither NULL nor
+empty it will add its contents to the `EXTRA_CFLAGS` variable in the
+makefile.
+
+For instance:
+
+	ac_has_proto_tag ("stdio.h", "-ansi", "fopen",
+	                    "FOPEN_IN_STDIO_WITH_ANSI");
+
+This will check if fopen() is defined in stdio.h when compiled with the
+-ansi flag. If it is it will define `HAVE_FOPEN_IN_STDIO_WITH_ANSI`.
+
+
+### ac_has_signature
+
+	int ac_has_signature (const char *includes, const char *cflags,
+	                        const char *func, const char *signature,
+	                        const char *tag);
+
+Checks if the header files listed in includes, when compiled with cflags
+define the function func with the signature given in signature. If it does
+it adds HAVE_<*tag*> to the configuration file and returns non-zero. If  the
+signature is found and *cflags* is neither NULL nor empty it will add  its
+contents to the EXTRA_CFLAGS variable in the makefile. For instance:
+
+	ac_has_signature ("string.h", NULL, "strerror_r", "int (*f)(int,char*,size_t)",
+	        "POSIX_STRERROR_R");
+
+	ac_has_signature ("string.h", NULL, "strerror_r", "char* (*f)(int,char*,size_t)",
+	        "GNU_STRERROR_R");
+
+Both GNU and POSIX define strerror_r but differ in the signature. The  above
+checks will detect if we have the POSIX or GNU version. The  signature must
+be written as a declaration of a function pointer with the  desired
+signature.
+
+It returns non zero if the signature is present, zero if it is missing.
+
+
+### ac_has_type
+
+	int ac_has_type (const char *includes, const char *cflags,
+	                   const char *tname);
+
+Same as `ac_has_type_tag()` but the tag is deduced from the name of the type.
+
+
+### ac_has_type_tag
+
+	int ac_has_type_tag (const char *includes, const char *cflags,
+	                       const char *tname, const char *tag);
+
+Check if *tname* is available as the name of a type after including the
+files listed in *includes* and compiling with the compilation flags
+*cflags*. If *tname* is available then define tag in the configuration file
+and return 1.
+
+
+### ac_has_var_attribute
+
+	int ac_has_var_attribute (const char *attribute, const char *external);
+
+Check if the attribute *attribute* is a valid attribute for variables. The
+macro *external* will be defined to the syntax required for the attribute.
+
+
+### ac_has_woe32
+
+	int ac_has_woe32 (void)
+
+Are we compiling for Woe?
+
+
+### ac_init
+
+	void ac_init (const char *extension, int argc, char **argv,
+	              int latest_c_version);
+
+This is the first function that *pelconf.c* should call. Extension is the
+extension used for the file that will contain the source code to be tested.
+Use ".c" for C files. Any other extensions will be treated as C++. The
+recomended extension for C++ files which is understood by most compilers is
+".cpp". argc and argv are just the arguments passed by the user. Set
+latest_c_version if you want to check for features of the latest C or C++
+standards. If latest_c_version is 0 it will not check for the latest
+standards. On GCC if *latest_c_version* is true then it will also select the
+appropriate flag like *-std=gnu++14*
+
+
+
+### ac_libobj
+
+	void ac_libobj (const char *func_name)
+
+Add *func_name.o* to the list of object files that must be compiled. This
+list is available as the value of the makefile variable `LIBOBJS`. It will
+usually be the list of files which provide replacements for missing
+functions.
+
+
+### ac_msg_error
+
+	int ac_msg_error (const char *msg);
+
+It will output an error message and stop the configuration. It always returns
+zero. It is intended to be used as the last term in a sequence of tests:
+`ac_check...() || ac_check...() || ac_msg_erro("Give up");`
+
+
+### ac_pkg_config_flags
+
+	int ac_pkg_config_flags (const char *s, char *buf, size_t n, pkgconf_flags what)
+
+Get the flags as given by pkg-config. *what* can be `pkgconf_cflags` or
+`pkgconf_libs`. Store the flags in the buffer *buf* of size *n*.
+
+
+### ac_replace_funcs
+
+	void ac_replace_funcs (const char *includes, const char *cflags, const char *funcs)
+
+After including the files listed in *includes* and compiling with the
+compilation flags *cflags* check for the presence of each of the functions
+listed in *funcs*. If the function is not available the add the object file
+*function_name.o* to the makefile variable *LIBOBJS*.
+
+
+### ac_set_var
+
+	void ac_set_var (const char *name, const char *value);
+
+Sets the makefile variable whose name is *name to the value stored in
+*value.
+
+
+### ac_show_help
+
+	void ac_show_help (void)
+
+Show the available options for the configuration program.
+
+
+### ac_use_macro_prefix
+
+	void ac_use_macro_prefix (const char *pfx)
+
+Prepend the prefix *pfx* to the macros created by the program.
+
+
+### ac_valid_cpp_expression
+
+	int ac_valid_cpp_expression (const char *includes, const char *cflags,
+	                             const char *expr)
+
+Check if the expression *expr* is a valid preprocessor expression after
+including the files listed in *includes* and compiling with the compilation
+flags *cflags*. Return true if the expresion compiles.
+
 
 
