@@ -2,50 +2,51 @@ PELCONF - AUTOCONF IN C
 =======================
 
 *Pelconf* is a simple tool that is similar to GNU's autoconf. It is used to
-test the compilation system and figure out what is available and adapt the
-software accordingly. The difference with autoconf is that it does not
-depend on the POSIX shell and tools. Instead it uses the C language to
-define the tests. Unlike other autoconf replacements like cmake, pelconf
-does not need any previous installation: your C compiler is enough. You
-don't have to learn a new configuration language or syntax. Everything is
-done in C. The tests to be run are written in C.
+test the compilation system and figure out which features are available and adapt the
+software accordingly. The difference with autoconf is that it does not depend
+on the POSIX shell and tools. Instead it uses the C language to define the
+tests. Unlike other autoconf replacements like cmake, pelconf does not need
+any previous installation: your C compiler is enough. You don't have to learn
+a new configuration language or syntax. Everything is done in C. The program that
+states which tests have to be run is written in C. You do not need to use any other
+tool beyond the C compiler.
 
 
 1 Porting software
 ------------------
 
-There are many ways of porting software and plenty of books have been
-written about the subject. This section describes only enough background to
-understand what pelconf does.
+There are many ways of porting software and plenty of books have been written 
+about the subject. This section describes only enough background to 
+understand what pelconf does. 
 
-A typical way of adapting software to work on multiple platforms is to use
-conditional compilation. The preprocessor is used to check for a condition
-and then according to the test result, different sections of code are
+A typical way of adapting software to work on multiple platforms is to use 
+conditional compilation. The preprocessor is used to check for a condition 
+and then according to the test result, different sections of code are 
 selected for compilation. For instance:
 
 	#ifdef __GNUC__
 		... use GNU features
 	#endif
 
-This fragment relies on the GCC compiler's predefined macro `__GNUC__`. If
-we are using GCC it is expected that `__GNUC__` will be defined.
+This fragment relies on the GCC compiler's predefined macro `__GNUC__`. If we 
+are using GCC it is expected that `__GNUC__` will be defined. 
 
-There are several problems inherent to this approach. First, you need to
-know which is the symbol that is defined by each of the supported compilers
-and environments. If a new symbol or a new version must be added then we must
-revisit each test. A more difficult problem is that it is not clear what
-should be activated by each define. For instance, in the item above we are
-just checking if we are using GCC. However GCC is available on many
-platforms and in many versions. Each of them offers features that are
-specific to the particular combination of platform and version. Maintaining
-such a battery of tests quickly becomes unmanageable. Just consider the
-different versions of GCC under Unix and Windows.
+There are several problems inherent to this approach. First, you need to know 
+which is the symbol that is defined by each of the supported compilers and 
+environments. If a new symbol or a new version must be added then we must 
+revisit each test. A more difficult problem is that it is not clear what 
+should be activated by each define. For instance, in the item above we are 
+just checking if we are using GCC. However GCC is available on many platforms 
+and in many versions. Each of them offers features that are specific to the 
+particular combination of platform and version. Maintaining such a battery of 
+tests quickly becomes unmanageable. Just consider the different versions of
+GCC under Unix and Windows. 
 
-A better approach is to test for features, not for systems. This is what
-autoconf does. You just check for the presence of a particular feature, and
-if it exists use it. This way we do not need to adapt each test to each
-particular version of the compiler and system. A single check is valid for
-all existing and future systems. For instance if we want to use `opendir()`
+A better approach is to test for features, not for systems. This is what 
+autoconf does. You just check for the presence of a particular feature, and 
+if it exists use it. This way we do not need to adapt each test to each 
+particular version of the compiler and system. A single check is valid for 
+all existing and future systems. For instance if we want to use `opendir()` 
 we would have something like:
 
 	#ifdef HAVE_OPENDIR
@@ -67,58 +68,59 @@ try to compile something like:
 		return f != 0;
 	}
 
-If this program compiles and links without errors then it means that the
-`opendir()` function is available. The configure script created by autoconf
-is very convenient for the user, but to generate the script itself the
-programmer must use a combination of Bash, M4 macro language and C. This
+If this program compiles and links without errors then it means that the 
+`opendir()` function is available. The configure script created by autoconf 
+is very convenient for the user, but to generate the script itself the 
+programmer must use a combination of Bash, M4 macro language and C. This 
 feels awkward.
 
-Pelconf removes the need to prepare the script with shell, M4 and C and
-instead allows the whole configuration test to be written in C. The user
+Pelconf removes the need to prepare the script with shell, M4 and C and 
+instead allows the whole configuration test to be written in C. The user 
 still runs the configure script as usual: `./configure`
+
 
 
 2 What pelconf does not do
 --------------------------
 
-The approach described above is what is used by autoconf, pelconf and many
-other configuration systems. There are some limitations to the approach. The
-configure script can check for the presence of features in the compiler,
-library or environment. The program can then adapt (using conditional
-compilation) by defining workarounds or limiting its functionality. However
-the configure script can't adapt the program if features that were
-considered to be always available are missing. For instance a program that
-uses `fopen()` will not compile on a system which lacks the `fopen()`
-function. If the author of a program did not foresee this possibility (which
-is likely only on embedded systems) then there is no way for any
-configuration system to solve the problem.
+The approach described above is what is used by autoconf, pelconf and many 
+other configuration systems. There are some limitations to the approach. The 
+configure script can check for the presence of features in the compiler, 
+library or environment. The program can then adapt (using conditional 
+compilation) by defining workarounds or limiting its functionality. However 
+the configure script can't adapt the program if features that were considered 
+to be always available are missing. For instance a program that uses 
+`fopen()` will not compile on a system which lacks the `fopen()` function. If 
+the author of a program did not foresee this possibility (which is likely 
+only on embedded systems) then there is no way for any configuration system 
+to solve the problem. 
 
-Although all hosted implementations are expected to have `fopen()`, other
-functions or features may be assumed to exist, and actually exist on all
-systems tested by the author. If the program is later ported to a system
-where this assumption fails then no configuration system can solve the
-problem. An example is the `opendir()` function. It is not part of the C
-standard. It is defined by POSIX and most compilers for Windows also
-implement it. Thus it is likely that the programmer will assume that the
-`opendir()` function is always available. If the program is later ported to
-a compiler that does not have the `opendir()` function the program will not
+Although all hosted implementations are expected to have `fopen()`, other 
+functions or features may be assumed to exist, and actually exist on all 
+systems tested by the author. If the program is later ported to a system 
+where this assumption fails then no configuration system can solve the 
+problem. An example is the `opendir()` function. It is not part of the C 
+standard. It is defined by POSIX and most compilers for Windows also 
+implement it. Thus it is likely that the programmer will assume that the 
+`opendir()` function is always available. If the program is later ported to a 
+compiler that does not have the `opendir()` function the program will not 
 compile, even with the configuration system.
 
 The previous paragraph makes it clear that when porting a program that uses
-autoconf/pelconf to a platform on which it has never been tested, new
-portability problems may become apparent. Thus it is better to consider
-*pelconf* as a way to adapt a program to many known optional features with a
+autoconf/pelconf to a platform on which it has never been tested, new 
+portability problems may become apparent. Thus it is better to consider 
+*pelconf* as a way to adapt a program to many known optional features with a 
 minimum effort.
 
 
 3  General structure
 --------------------
 
-The *pelconf* system assumes that you have a compiler that supports C90. This
-is the case for any current C or C++ implementation. Under *pelconf* you
-write a small C program called *pelconf.c*. You also distribute with it the
-*pelconflib.c* and *configure* files. The *configure* file attempts to
-compile *pelconf.c* and then run the resulting executable file. The
+The *pelconf* system assumes that you have a compiler that supports C90. This 
+is the case for any current C or C++ implementation. Under *pelconf* you 
+write a small C program called *pelconf.c*. You also distribute with it the 
+*pelconflib.c* and *configure* files. The *configure* file attempts to 
+compile *pelconf.c* and then run the resulting executable file. The 
 executable file then conducts compilation and linking tests as directed by
 the *pelconf.c* file. Here is an example *pelconf.c* file
 
@@ -143,11 +145,11 @@ the *pelconf.c* file. Here is an example *pelconf.c* file
 			return 0;
 		}
 
-Line 0 just includes the *pelconflib.c* file and makes its functions
-available for the pelconf.c program. Including it in *pelconf.c* allows us
-to simplify the generation of the executable file.
+Line 0 just includes the *pelconflib.c* file and makes its functions 
+available for the pelconf.c program. Including it in *pelconf.c* allows us to 
+simplify the generation of the executable file.
 
-Line 1 tells pelconf that we are going to use a C++ compiler and that we
+Line 1 tells pelconf that we are going to use a C++ compiler and that we 
 would like to use the latest C++ standard that is supported by the compiler.
 
 Line 2 checks for the presence of the `<unistd.h>` header.
@@ -171,10 +173,10 @@ Line 8 creates a *peltk.pc* file suitable for package-config.
 Line 9 cleans up temporary files.
 
 
-If we run configure with this *pelconf.c* file a *config.h* file will be
-created. On a Mingw system *pelconf* found that `gettimeofday()` was
-available and defined the `HAVE_GETTIMEOFDAY` macro in *config.h*. On the
-other hand it could not find `clock_gettime()` and did not define any macro.
+If we run configure with this *pelconf.c* file a *config.h* file will be 
+created. On a Mingw system *pelconf* found that `gettimeofday()` was 
+available and defined the `HAVE_GETTIMEOFDAY` macro in *config.h*. On the 
+other hand it could not find `clock_gettime()` and did not define any macro. 
 Thus the program can adapt as follows:
 
 	#include "config.h"
@@ -195,25 +197,25 @@ Thus the program can adapt as follows:
 		// just use time()
 	#endif
 
-The *config.h* file also contains many other pieces of information concerning
-the compiler and the library. For instance it checks if `<stdint.h>` is
-available and if it isn't it creates the suitable typedefs.
+The *config.h* file also contains many other pieces of information concerning 
+the compiler and the library. For instance it checks if `<stdint.h>` is 
+available and if it isn't it creates the suitable typedefs. 
 
-*Pelconf* also processes the existing *makefile.in* and puts the result in
-*makefile*. *makefile* contains the contents of *makefile.in* prepended with
+*Pelconf* also processes the existing *makefile.in* and puts the result in 
+*makefile*. *makefile* contains the contents of *makefile.in* prepended with 
 information about the compiler, its options and required libraries. If for
-instance the `clock_gettime()` was found to be in the *rt* library the
-*makefile* would contain a line like this: `EXTRALIBS=-lrt` (or
-`EXTRALIBS=rt.lib` for a DOS/Windows compiler). In some cases you want to
-have some particular makefile variables set to your own values. The
-configuration program searches the compilation environment for a file called
-*pelconf.var*. If this file is found then a directive will be inserted in
-the makefile to include it in the file. The *pelconf.var* file usually
-contains predefined settings of makefile variables. The include statement is
-inserted after all the variable definitions created by the program: this
-implies that whatever you write in *pelconf.var* overrides the settings
-created by the configuration program. The configuration program will search
-for *pelconf.var* in several places:
+instance the `clock_gettime()` was found to be in the *rt* library the 
+*makefile* would contain a line like this: `EXTRALIBS=-lrt` (or 
+`EXTRALIBS=rt.lib` for a DOS/Windows compiler). In some cases you want to 
+have some particular makefile variables set to your own values. The 
+configuration program searches the compilation environment for a file called 
+*pelconf.var*. If this file is found then a directive will be inserted in the 
+makefile to include it in the file. The *pelconf.var* file usually contains 
+predefined settings of makefile variables. The include statement is inserted 
+after all the variable definitions created by the program: this implies that 
+whatever you write in *pelconf.var* overrides the settings created by the 
+configuration program. The configuration program will search for 
+*pelconf.var* in several places:
 
 1. the file name and location may be given in the command line using the
    `--makevars=name` command line option. Using this option you can specify
@@ -229,13 +231,13 @@ Using option 2 enables having project specific options. Using option 3
 enables having machine specific options that apply to all projects.
 
 
-The pelconf program produces the configuration file, usually named
-*config.h*, the makefile and the pkg-config configuration file. The
-configuration file, *config.h*, contains all the code (defines, typedefs,
-inlines) that the source code will include. The makefile is generated by
-prepending to an existing input makefile (usually *makefile.in*) the set of
-makefile variables that the configuration program defines. The resulting
-makefile can then use these variables. Finally the generated pkg-config file
+The pelconf program produces the configuration file, usually named 
+*config.h*, the makefile and the pkg-config configuration file. The 
+configuration file, *config.h*, contains all the code (defines, typedefs, 
+inlines) that the source code will include. The makefile is generated by 
+prepending to an existing input makefile (usually *makefile.in*) the set of 
+makefile variables that the configuration program defines. The resulting 
+makefile can then use these variables. Finally the generated pkg-config file 
 can be directly stored in the directory containing the pkg-config database.
 
 The different tests that are run by the pelconf program are written to the
@@ -246,13 +248,12 @@ the problem have a look at *configure.log*.
 4 The configure file
 --------------------
 
-The *configure* file just attempts to compile the *pelconf.c* file and run
-it. If the compilation command is not given explicitely with `--cc=<cmd>`
-option then it will try using the make program to compile *pelconf* using
-the system's default compiler. If this fails it will try *gcc* or *g++*. If
-for whatever reason *configure* fails to compile the *pelconf.c* program you
-can try to compile it manually. For instance if your compiler is called `dmc`
-use
+The *configure* file just attempts to compile the *pelconf.c* file and run 
+it. If the compilation command is not given explicitely with `--cc=<cmd>` 
+option then it will try using the make program to compile *pelconf* using the 
+system's default compiler. If this fails it will try *gcc* or *g++*. If for 
+whatever reason *configure* fails to compile the *pelconf.c* program you can 
+try to compile it manually. For instance if your compiler is called `dmc` use
 
 	./configure --cc=dmc
 
@@ -280,11 +281,14 @@ checked.
 6 The *pelconflib.c* file
 -------------------------
 
-The *pelconflib.c* file provides the functionality to check the system. It
-contains many functions, some of them intended for internal use. Those
-functions that are intended for internal use have the `aci_` prefix. The ones
-that are part of the public API use the prefix `ac_`. The rest of this
-document describes the functions that are provided by *pelconflib.c*.
+The *pelconflib.c* file provides the functionality to check the system. It 
+contains many functions, some of them intended for internal use. Those 
+functions that are intended for internal use have the `aci_` prefix. The ones 
+that are part of the public API use the prefix `ac_`. The rest of this 
+document describes the functions that are provided by public API of
+*pelconflib.c*.
+
+
 
 7 Structure of *pelconf.c*
 --------------------------
@@ -315,17 +319,22 @@ An skeleton file would be:
 General tests are run by `ac_init()`. Project specific tests are written by
 you using the functions that are available in *pelconflib.c*.
 
+
+
+
 8 General tests
 ---------------
 
-The general tests run by `ac_init()` determine information about the
-compiler command line, support for standards. They are listed below.
+The general tests run by `ac_init()` determine information about the compiler 
+command line, support for standards. They are listed below.
+
+
 
 8.1 Compiler flags
 ------------------
 
-The configuration program probes the compiler to identify it and assert
-which compiler flags are accepted. The compilation command is taken from the
+The configuration program probes the compiler to identify it and assert which 
+compiler flags are accepted. The compilation command is taken from the 
 command line or the environment variable CC (or CXX for C++).
 
 Next the program checks for some known predefined macros used by compilers:
@@ -567,6 +576,18 @@ from the compilation environment, not from the runtime environment. This applies
 to such things like determining the size of a given type or determining the
 endianness. This is done without running the compiled program.
 
+Some of the following functions accept a string that contains header files 
+that must be included. Some other functions accept a string that contains 
+library names that the test program must be linked with. When specifying such 
+strings the items are separated by spaces and commas. For instance the string 
+"sys/types.h stdio.h" specifies the two included files `<sys/types.h>` and 
+`<stdio.h>`. The string "rt peltk-formats" specifies the libraries given in 
+the command line with `-lrt` and `-lpeltk-formats`.
+
+If no header file name or library name is to be passed to a function that 
+accepts such arguments you can either pass the empty string `""` or just pass 
+NULL. 
+
 
 
 9.1 Checking if header files are available
@@ -671,7 +692,20 @@ check for this field with
 If the field is present `HAVE_C99_LCONV` will be defined.
 
 
-9.5 Checking the size of a type
+
+9.5 Checking for member functions
+---------------------------------
+
+The `ac_has_member()` function can test whether a field has been declared in 
+a C struct. When we need to know if a C++ class has a given member function 
+we use the `ac_has_member_lib()` and `ac_has_member_lib_tag()` functions. 
+These functions use the compiler and the linker to verify that the member 
+function has been declared and also that its implementation has been provided 
+in some library.
+
+
+
+9.6 Checking the size of a type
 -------------------------------
 
 In some cases we need to know the size of a given type. We could use
@@ -686,7 +720,7 @@ The test above will return the `sizeof(wchar_t)` and will define the macro
 `SIZEOF_WCHAR_T` to the size of `wchar_t`.
 
 
-9.6 Checking for defined macros
+9.7 Checking for defined macros
 -------------------------------
 
 Any program may check for the presence of macros by using #ifdef. The test
@@ -695,7 +729,7 @@ macro is defined. It may then modify the makefile accordingly or run
 additional tests.
 
 
-9.7 Checking for preprocessor expressions
+9.8 Checking for preprocessor expressions
 -----------------------------------------
 
 We may need in some cases to check if a given expression is valid in the
@@ -703,7 +737,7 @@ preprocessor. Use the `ac_valid_cpp_expression()` function for this purpose.
 
 
 
-9.8 General checks for compilation of code
+9.9 General checks for compilation of code
 ------------------------------------------
 
 The tests above can be seen as specialized versions of a general check to
@@ -759,6 +793,18 @@ in the default library it checks if it is available in the *rt* library.
 If it turns out that the *rt* library is required, the name of the required
 library will be added to the makefile variable EXTRALIBS.
 
+There is a special case when headers and libraries are written in C and the
+headers are not prepared to be used from C++. Many libraries work both with C
+and C++ programs by wrapping their declarations with `extern "C" {}`. However
+some pure C libraries do not and the C++ program using them must provide the
+wrapper. The functions `ac_has_func_lib_cxx()` and `ac_has_func_lib_tag_cxx()`
+perform the same tests as above but they wrap the headers within `extern "C"`
+brackets. An example where this is needed is
+
+	ac_has_func_lib_cxx ("libavformat/avformat.h", "-D__STDC_CONSTANT_MACROS",
+	                     "av_register_all", "avformat avcodec")
+
+
 
 
 10.2 General testing of the linking environment
@@ -781,8 +827,42 @@ If we compile this with *gcc -march=i386* the program will not link because
 
 
 
+11 Pkg-config
+-------------
 
-11 Miscelaneous tests
+`pkg-config` is a tool that is available under many systems that manages a
+catalog of compilation and linking flags that are needed in order to use a
+library. The command `pkg-config --cflags <libname>` will output the flags
+that need to be passed to the compiler in order to be able to compile a
+program that uses the library <libname>. The command `pkg-config --libs
+<libname>` will output the flags that are passed when linking a program that
+uses the library. pelconfig can use the pkg-config database.
+
+You can check if `pkg-config` has been installed by calling
+`ac_has_pkg_config()`.
+
+Pelconf can create a `.pc` file to be used with pkg-config that describes the
+flags that our library will use. You can generate such a file by calling
+`ac_create_pc_file ("foo.pc", "The foo library")`. The first argument is the
+name of the `.pc` file to be created. The second argument is the short
+description of the library that pkg-config will show when listing the library.
+
+The functions `ac_has_func_pkg_config()` and `ac_has_func_pkg_config_tag()`
+are the same as `ac_has_func_lib()` variants but they first check the
+availability of the function using pkg-config queries. If there is no
+pkg-config or if it fails then these functions will call the `_lib()`
+variants.
+
+`ac_has_member_pkg_config()` and `ac_has_member_pkg_config_tag()` are the
+same as the `ac_has_member_lib()` functions but they first check if the member
+is available using the pkg-config database. If the check fails then they will
+attempt the compilation using the `_lib()` functions.
+
+You can directly query the pkg-config database using the
+`ac_pkg_config_flags()` function.
+
+
+12 Miscelaneous tests
 --------------------
 
 `ac_has_file()` can be used to verify if a given file is present in the
@@ -791,7 +871,7 @@ execution environent.
 
 
 
-12 Reference
+13 Reference
 ------------
 
 
@@ -858,7 +938,27 @@ Check for the presence of each function in *funcs*. Use it after
 	                                    const char *cflags);
 
 This will check for each header file in *includes*, behaving as if
-`ac_has_headers()` was called with each of the header files individually.
+`ac_has_headers()` was called with each of the header files individually. In 
+addition the headers that are found will be remembered and included before 
+checking the following headers. For instance:
+
+	ac_check_each_header_sequence ("foo1.h foo2.h foo3.h foo4.h", NULL);
+
+will check first if `<foo1.h>` can be used. If `<foo1.h>` exists then it will 
+check if `<foo2.h>` can be included after including `<foo1.h>` and so on. 
+Assume that `<foo1.h>`, `<foo2.h>` and `<foo4.h>` exist but `<foo3.h>` does 
+not exist. The checks will be as follows:
+
+1. First test: `#include <foo1.h>`  (succeeds)
+2. Second test: `#include <foo1.h>  #include <foo2.h>` (succeeds)
+3. Third test: `#include <foo1.h> #include <foo2.h> #include <foo3.h>` (fails)
+4. Fourth test: `#include <foo1.h> #include <foo2.h> #include <foo4.h>` (succeeds)
+
+The set of found headers will be remembered and used when the 
+`ac_check_each_func()` function is called. Before running the tests for the 
+functions if will include all the headers found by 
+`ac_check_each_header_sequence()`. The use of these two functions allows a 
+quick checking for the presence of a set of headers and functions.
 
 
 ### ac_check_same_cxx_types
@@ -1015,7 +1115,7 @@ non zero if the attribute is available.
 	                       const char *func, const char *libs, int verbatim);
 
 Same as `ac_has_func_lib_tag()` but the tag name is deduced from the name of
-the function. For instance we may want to check how to compile under Win32 
+the function. For instance we may want to check how to compile under Win32
 when using threads:
 
 	ac_has_func_lib ("process.h", NULL, "_beginthread", NULL) ||
@@ -1139,7 +1239,7 @@ field.
 	                       const char *func, const char *libs,
 	                       int verbatim)
 
-Same as `ac_has_member_lig_tag()` but the tag name is deduced from the name
+Same as `ac_has_member_lib_tag()` but the tag name is deduced from the name
 of the function. For instance:
 
 	ac_has_member_lib ("peltk/formats/exif.hpp", NULL,
@@ -1181,24 +1281,6 @@ Same as `ac_has_member_pkg_config_tag()` but the tag is deduced from func.
 Similar to `ac_has_member_lib_tag()` but it first uses pkg-config if
 available and if this fails it uses `ac_has_member_lib_tag()`.
 
-Pkg-config is needed on ELF systems when linking with static libraries. For
-instance library A needs library B. If the library A is a static library it
-will contain no indication that libB is needed and we must supply it.
-
-Pkg-config is needed on Woe for both static and dynamic linking. For static
-linking the same reasons as with ELF apply. For dynamic linking there is a
-problem with PE linking: it expects that all its dependencies are
-explicitely listed in the command line. For instance if we use *libA.dll* and
-the headers of *libA.dll* have inline functions that refer to functions
-*libB.dll* our object code will contain calls to functions in *libB.dll*.
-When linking with ELF all functions are looked up in all needed shared
-objects. The *libA.so* shared object will introduce *libB.so* into the list
-of needed shared objects. When the linker looks for the functions required
-for our program it will also look into *libB.so* and will find them there.
-ELF was designed to provide this flexibility. However PE is very primitive
-and we must supply all libraries in the command line, even those which are
-required only due to inline references and are not part of the API. This is
-why Woe needs pkg-config for all libraries.
 
 
 ### ac_has_member_tag
@@ -1221,7 +1303,7 @@ See if pkg-config is installed and working.
 ### ac_has_proto
 
 	int ac_has_proto (const char *includes, const char *cflags,
-	                    const char *func);
+	                  const char *func);
 
 Same as calling `ac_has_proto_tag()` but with the tag deduced from the
 function name. For instance:
@@ -1306,11 +1388,11 @@ Check if the attribute *attribute* is a valid attribute for variables. The
 macro *external* will be defined to the syntax required for the attribute.
 
 
-### ac_has_woe32
+### ac_has_windows
 
-	int ac_has_woe32 (void)
+	int ac_has_windows (void)
 
-Are we compiling for Woe?
+Are we compiling for Windows?
 
 
 ### ac_init

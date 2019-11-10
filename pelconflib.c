@@ -49,8 +49,8 @@ static int aci_simple = 0;
 /* Use static linking. */
 static int aci_static = 0;
 
-/* Are we compiling under Woe (includes cygwin)? */
-static int aci_have_woe32 = 0;
+/* Are we compiling under Windows (includes cygwin)? */
+static int aci_have_windows = 0;
 
 /* Are we using cygwin? */
 static int aci_have_cygwin = 0;
@@ -651,7 +651,7 @@ typedef struct {
 } aci_varlist_t;
 
 
-// List of program source code chunks that will be included in the config file.
+/* List of program source code chunks that will be included in the config file. */
 static aci_strlist_t aci_tdefs;
 
 /* List of packages that were found using pkg-config. */
@@ -687,11 +687,13 @@ static void aci_varlist_destroy (aci_varlist_t *vl)
 
 
 
-// Add to the variable list vl a variable with the name "name" and with the
-// value "value". If the variable already exits: if replace is true then
-// replace the previous value with the new "value". If the variable already
-// exists and replace is false either append or prepend to the exiting list
-// of values depending on "prepend".
+/******************
+ Add to the variable list vl a variable with the name "name" and with the
+ value "value". If the variable already exits: if replace is true then
+ replace the previous value with the new "value". If the variable already
+ exists and replace is false either append or prepend to the exiting list
+ of values depending on "prepend".
+*****************/
 
 static void
 aci_varlist_add (aci_varlist_t *vl, const char *name, const char *value,
@@ -725,9 +727,11 @@ aci_varlist_add (aci_varlist_t *vl, const char *name, const char *value,
 }
 
 
-// Add the variable name to the variable list vl with the value value. If
-// the variable already exits either prepend or append the value to the
-// existing value of the variable.
+/**************
+ Add the variable name to the variable list vl with the value value. If
+ the variable already exits either prepend or append the value to the
+ existing value of the variable.
+**************/
 static void aci_varlist_cat (aci_varlist_t *vl, const char *name, const char *value,
                              int prepend)
 {
@@ -735,15 +739,15 @@ static void aci_varlist_cat (aci_varlist_t *vl, const char *name, const char *va
 }
 
 
-// Add the variable name to the variable list vl with value "value".
-// Overwrite if the variable is already in the list.
+/* Add the variable name to the variable list vl with value "value".
+   Overwrite if the variable is already in the list. */
 static void aci_varlist_set (aci_varlist_t *vl, const char *name, const char *value)
 {
 	aci_varlist_add (vl, name, value, 1, 0);
 }
 
 
-// Find the variable "name" in the list. Return NULL if not found.
+/* Find the variable "name" in the list. Return NULL if not found. */
 static aci_varnode_t *aci_varlist_find (aci_varlist_t *vl, const char *name)
 {
 	aci_varnode_t *vn = vl->root;
@@ -754,8 +758,8 @@ static aci_varnode_t *aci_varlist_find (aci_varlist_t *vl, const char *name)
 }
 
 
-// Dump the variable list to the file dst. If sep is true separate the name
-// of the variable from its value with the equal sign.
+/* Dump the variable list to the file dst. If sep is true separate the name
+   of the variable from its value with the equal sign. */
 static void aci_varlist_dump (const aci_varlist_t *vl, FILE *dst, int sep)
 {
 	aci_varnode_t *vn = vl->root;
@@ -780,7 +784,7 @@ static void aci_varlist_dump (const aci_varlist_t *vl, FILE *dst, int sep)
 }
 
 
-// Dump the feature list.
+/* Dump the feature list. */
 static void aci_dump_features (const aci_varlist_t *vl, FILE *dst, const char *prefix)
 {
 	aci_varnode_t *vn = vl->root;
@@ -819,18 +823,18 @@ static void aci_dump_features (const aci_varlist_t *vl, FILE *dst, const char *p
 }
 
 
-// A node in the list of checked flags.
+/* A node in the list of checked flags. */
 typedef struct aci_flag_item_t {
-	// The name of the flag and its description.
+	/* The name of the flag and its description. */
 	char *tag, *comment;
-	// Did we successfuly pass the test?
+	/* Did we successfuly pass the test? */
 	int passed;
-	// Next flag in list.
+	/* Next flag in list. */
 	struct aci_flag_item_t *next;
 } aci_flag_item_t;
 
 
-// Dispose the list of flags.
+/* Dispose the list of flags. */
 static void aci_flag_list_free (aci_flag_item_t *root)
 {
 	aci_flag_item_t *fi;
@@ -845,8 +849,8 @@ static void aci_flag_list_free (aci_flag_item_t *root)
 	}
 }
 
-// Add the flag (tag, comment, passed) to the list of flags, just after
-// *prev.
+/* Add the flag (tag, comment, passed) to the list of flags, just after
+   *prev. */
 static void aci_flag_add_here (aci_flag_item_t **prev, const char *tag,
                                const char *cmt, int passed)
 {
@@ -859,7 +863,7 @@ static void aci_flag_add_here (aci_flag_item_t **prev, const char *tag,
 }
 
 
-// Add the flag to the list of flags, overwriting the existing value.
+/* Add the flag to the list of flags, overwriting the existing value. */
 static void aci_flag_list_add (aci_flag_item_t **root, const char *tag,
             const char *cmt, int passed)
 {
@@ -902,7 +906,7 @@ static void aci_flag_list_add (aci_flag_item_t **root, const char *tag,
 }
 
 
-// Write the list of flags to the file dst.
+/* Write the list of flags to the file dst. */
 static void aci_flag_list_dump (aci_flag_item_t *fi, FILE *dst)
 {
 	while (fi) {
@@ -917,19 +921,19 @@ static void aci_flag_list_dump (aci_flag_item_t *fi, FILE *dst)
 }
 
 
-// The list of flags that are checked.
+/* The list of flags that are checked. */
 static aci_flag_item_t *aci_flags_root = NULL;
 
 
-// The public interface to add a flag to the config.h file.
+/* The public interface to add a flag to the config.h file. */
 void ac_add_flag (const char *name, const char *comment, int passed)
 {
 	aci_flag_list_add (&aci_flags_root, name, comment, passed);
 }
 
 
-// Add literal source code to the config file. If unique is nonzero make
-// sure that the source code is not duplicated.
+/* Add literal source code to the config file. If unique is nonzero make
+   sure that the source code is not duplicated. */
 void ac_add_code (const char *src_code, int unique)
 {
 	if (unique) {
@@ -939,8 +943,8 @@ void ac_add_code (const char *src_code, int unique)
 	}
 }
 
-// Set the value of a makefile variable. It makes sure that the variable is
-// converted to a syntax compatible with make.
+/* Set the value of a makefile variable. It makes sure that the variable is
+   converted to a syntax compatible with make. */
 void ac_set_var (const char *name, const char *value)
 {
 	char big[1000];
@@ -948,8 +952,8 @@ void ac_set_var (const char *name, const char *value)
 	aci_varlist_set (&aci_makevars, big, value);
 }
 
-// Same as above but if the variable has already been defined then prepend
-// value  to the existing value of name.
+/* Same as above but if the variable has already been defined then prepend
+   value  to the existing value of name. */
 void ac_add_var_prepend (const char *name, const char *value)
 {
 	char big[1000];
@@ -957,8 +961,8 @@ void ac_add_var_prepend (const char *name, const char *value)
 	aci_varlist_cat (&aci_makevars, big, value, 1);
 }
 
-// Same as above but if the variable has already been defined then append
-// "value"to the existing value of name.
+/* Same as above but if the variable has already been defined then append
+   "value"to the existing value of name. */
 void ac_add_var_append (const char *name, const char *value)
 {
 	char big[1000];
@@ -967,8 +971,8 @@ void ac_add_var_append (const char *name, const char *value)
 }
 
 
-// Write to the file dst the list of strings. If with_lf is nonzero then
-// write each string in a separate line.
+/* Write to the file dst the list of strings. If with_lf is nonzero then
+   write each string in a separate line. */
 static void aci_dump_strlist (aci_strlist_t *aci_tdefs, FILE *dst, int with_lf)
 {
 	char **beg, **end;
@@ -987,7 +991,7 @@ static void aci_dump_strlist (aci_strlist_t *aci_tdefs, FILE *dst, int with_lf)
 }
 
 
-// Copy the output of the commands and their errors to the log file.
+/* Copy the output of the commands and their errors to the log file. */
 static void aci_copy_to_log (void)
 {
 	FILE *fr, *fw;
@@ -1020,7 +1024,7 @@ static void aci_copy_to_log (void)
 
 
 
-// Run a command with stdout and stderr redirected.
+/* Run a command with stdout and stderr redirected. */
 static int aci_run_silent (const char *cmd)
 {
 	sbuf_t scmd;
@@ -1035,14 +1039,14 @@ static int aci_run_silent (const char *cmd)
 }
 
 
-// Advance s to the first non space character.
+/* Advance s to the first non space character. */
 static const char * aci_eatws (const char *s)
 {
 	while (isspace(*s)) ++s;
 	return s;
 }
 
-// Advance s to the first space character.
+/* Advance s to the first space character. */
 static const char * aci_eatnws (const char *s)
 {
 	while (*s && !isspace(*s)) ++s;
@@ -1050,8 +1054,8 @@ static const char * aci_eatnws (const char *s)
 }
 
 
-// Find the last character that is not a space in the string delimited by
-// start and end.
+/* Find the last character that is not a space in the string delimited by
+   start and end. */
 static const char * aci_last_non_blank (const char *start, const char *end)
 {
 	while (end > start && isspace(end[-1])) --end;
@@ -1060,8 +1064,8 @@ static const char * aci_last_non_blank (const char *start, const char *end)
 
 
 
-// Add to the string in sb the default compilation flags plus the flags
-// specified in "flags".
+/* Add to the string in sb the default compilation flags plus the flags
+   specified in "flags". */
 static void aci_add_cflags (sbuf_t *sb, const char *flags)
 {
 	const char *sow, *eow;
@@ -1098,7 +1102,7 @@ static void aci_add_cflags (sbuf_t *sb, const char *flags)
 }
 
 
-// Add the given flags to the makefile variable "EXTRA_CFLAGS".
+/* Add the given flags to the makefile variable "EXTRA_CFLAGS". */
 static void aci_add_cflags_to_makevars (const char *cflags)
 {
 	const char *sow, *eow;
@@ -1125,8 +1129,8 @@ static void aci_add_cflags_to_makevars (const char *cflags)
 
 
 
-// Assuming that sb contains the source code, add the headers that are
-// listed in "includes". The headers are separated by spaces or commas.
+/* Assuming that sb contains the source code, add the headers that are
+   listed in "includes". The headers are separated by spaces or commas. */
 static void aci_add_headers (sbuf_t *sb, const char *includes)
 {
 	const char *start, *end, *separator;
@@ -1155,10 +1159,11 @@ static void aci_add_headers (sbuf_t *sb, const char *includes)
 }
 
 
-// Add the default libraries plus the "libs" libraries to the string sb.
-// This will be used as the command line to the compiler when linking. The
-// libs string contains the list of libraries separted with either commas or
-// spaces.
+/* Add the default libraries plus the "libs" libraries to the string sb.
+   This will be used as the command line to the compiler when linking. The
+   libs string contains the list of libraries separted with either commas or
+   spaces.
+*/
 static void aci_add_libraries (sbuf_t *sb, const char *libs)
 {
 	const char *sow, *eow;
@@ -1189,7 +1194,7 @@ static void aci_add_libraries (sbuf_t *sb, const char *libs)
 
 
 
-// Show the message and stop the configuration.
+/* Show the message and stop the configuration. */
 int ac_msg_error (const char *hint)
 {
 	printf ("Fatal error while configuring: %s\n", hint);
@@ -1200,8 +1205,8 @@ int ac_msg_error (const char *hint)
 
 
 
-// Check if we can compile the src with the given flags. Returns nonzero if
-// we can compile successfully.
+/* Check if we can compile the src with the given flags. Returns nonzero if
+   we can compile successfully. */
 static int aci_can_compile (const char *src, const char *cflags)
 {
 	int rc;
@@ -1318,7 +1323,7 @@ static int aci_has_includes (const char *includes, const char *cflags)
 }
 
 
-// Add the flags to the string sb.
+/* Add the flags to the string sb. */
 static void aci_cat_cflags_cmt (sbuf_t *sb, const char *cflags)
 {
 	if (cflags != NULL && *cflags) {
@@ -1330,10 +1335,11 @@ static void aci_cat_cflags_cmt (sbuf_t *sb, const char *cflags)
 
 
 
-// Check if we can include the headers listed in "includes" while compiling
-// with the flags "cflags". If successful add tag to the configuration tags
-// defined in config.h and add the cflags to the CFLAGS defined in the
-// makefile.
+/* Check if we can include the headers listed in "includes" while compiling
+   with the flags "cflags". If successful add tag to the configuration tags
+   defined in config.h and add the cflags to the CFLAGS defined in the
+   makefile.
+*/
 int ac_has_headers_tag (const char *includes, const char *cflags, const char *tag)
 {
 	int result;
@@ -1343,10 +1349,11 @@ int ac_has_headers_tag (const char *includes, const char *cflags, const char *ta
 	sbufformat (&comment, 1, "Has headers [%s]", includes);
 	aci_cat_cflags_cmt (&comment, cflags);
 
+	printf ("%s : ", sbufchars (&comment));
 	result = aci_has_includes (includes, cflags);
 	aci_flag_list_add (&aci_flags_root, tag, sbufchars(&comment), result);
 
-	printf ("%s : %s\n", sbufchars (&comment), aci_noyes[result]);
+	printf ("%s\n", aci_noyes[result]);
 	fflush (stdout);
 	if (result) {
 		aci_add_cflags_to_makevars (cflags);
@@ -1356,8 +1363,9 @@ int ac_has_headers_tag (const char *includes, const char *cflags, const char *ta
 	return result;
 }
 
-// Same as above, but the tag will be automatically defined based on the
-// name of the included files.
+/* Same as above, but the tag will be automatically defined based on the
+   name of the included files.
+*/
 int ac_has_headers (const char *includes, const char *cflags)
 {
 	char tag[BUFSIZE];
@@ -1368,15 +1376,16 @@ int ac_has_headers (const char *includes, const char *cflags)
 }
 
 
-// List of headers that we need.
+/* List of headers that we need. */
 static sbuf_t aci_common_headers;
 
 
-// Includes provides a list of headers separated by commas or spaces. The
-// function checks for the availability of each header in the same order as
-// in the string while using the compilation flags cflags. The list of
-// headers which are available will be added to the aci_common_headers
-// variable.
+/* Includes provides a list of headers separated by commas or spaces. The
+   function checks for the availability of each header in the same order as
+   in the string while using the compilation flags cflags. The list of
+   headers which are available will be added to the aci_common_headers
+   variable.
+*/
 void ac_check_each_header_sequence (const char *includes, const char *cflags)
 {
 	const char *start, *end, *separator;
@@ -1455,8 +1464,9 @@ static int aci_have_function_proto (const char *includes, const char *cflags,
 }
 
 
-// Return non-zero if the func is defined after including the file include
-// and has the signature specified in "signature".
+/* Return non-zero if the func is defined after including the file include
+   and has the signature specified in "signature".
+*/
 static int aci_have_signature (const char *includes, const char *cflags,
         const char *func, const char *signature)
 {
@@ -1473,9 +1483,10 @@ static int aci_have_signature (const char *includes, const char *cflags,
 }
 
 
-// Check if the function "func" is declared after including the files listed
-// in "includes" and compiling with the compilation flags "cflags". If the
-// function is declared then define the tag "tag" in the config.h file.
+/* Check if the function "func" is declared after including the files listed
+   in "includes" and compiling with the compilation flags "cflags". If the
+   function is declared then define the tag "tag" in the config.h file.
+*/
 int ac_has_proto_tag (const char *includes, const char *cflags,
             const char *func, const char *tag)
 {
@@ -1487,10 +1498,11 @@ int ac_has_proto_tag (const char *includes, const char *cflags,
 	        func, includes);
 	aci_cat_cflags_cmt (&sb, cflags);
 
+	printf ("%s: ", sbufchars (&sb));
 	result = aci_have_function_proto (includes, cflags, func);
 	aci_flag_list_add (&aci_flags_root, tag, sbufchars (&sb), result);
 
-	printf ("%s: %s\n", sbufchars (&sb), aci_noyes[result]);
+	printf ("%s\n", aci_noyes[result]);
 	fflush (stdout);
 
 	if (result) {
@@ -1501,8 +1513,9 @@ int ac_has_proto_tag (const char *includes, const char *cflags,
 	return result;
 }
 
-// Same as above but the tag is automatically deduced from the name of the
-// function.
+/* Same as above but the tag is automatically deduced from the name of the
+   function.
+*/
 int ac_has_proto (const char *includes, const char *cflags, const char *func)
 {
 	char tag[BUFSIZE];
@@ -1513,10 +1526,11 @@ int ac_has_proto (const char *includes, const char *cflags, const char *func)
 }
 
 
-// Check if the function "func" is declared with the signature
-// "signature" after including the files listed in "includes" and compiling
-// with the compilation flags "cflags". If the function is declared then
-// define the tag "tag" in the config.h file.
+/* Check if the function "func" is declared with the signature
+   "signature" after including the files listed in "includes" and compiling
+   with the compilation flags "cflags". If the function is declared then
+   define the tag "tag" in the config.h file.
+*/
 int ac_has_signature (const char *includes, const char *cflags,
         const char *func, const char *signature, const char *tag)
 {
@@ -1528,10 +1542,11 @@ int ac_has_signature (const char *includes, const char *cflags,
 	            func, signature, includes);
 	aci_cat_cflags_cmt (&sb, cflags);
 
+	printf ("%s: ", sbufchars (&sb));
 	result = aci_have_signature (includes, cflags, func, signature);
 	aci_flag_list_add (&aci_flags_root, tag, sbufchars (&sb), result);
 
-	printf ("%s: %s\n", sbufchars (&sb), aci_noyes[result]);
+	printf ("%s\n", aci_noyes[result]);
 	fflush (stdout);
 
 	if (result) {
@@ -1544,9 +1559,10 @@ int ac_has_signature (const char *includes, const char *cflags,
 
 
 
-// Check for compilation and linking success with the given included files,
-// compilation flags and libraries. Return nonzero if the compilation and
-// linking steps succeed.
+/* Check for compilation and linking success with the given included files,
+   compilation flags and libraries. Return nonzero if the compilation and
+   linking steps succeed.
+*/
 static int aci_have_lib_function (const char *includes, const char *cflags,
                 const char *func, const char *libnames, int verbatim)
 {
@@ -1572,11 +1588,12 @@ static int aci_have_lib_function (const char *includes, const char *cflags,
 
 
 
-// Check for compilation and linking success with the given included files,
-// compilation flags and libraries. The included files are assumed to be
-// pure C header files that are used in a C++ source file. They are included
-// between #ifdef __cplusplus and #endif. Return nonzero if the compilation
-// and linking steps succeed.
+/* Check for compilation and linking success with the given included files,
+   compilation flags and libraries. The included files are assumed to be
+   pure C header files that are used in a C++ source file. They are included
+   between #ifdef __cplusplus and #endif. Return nonzero if the compilation
+   and linking steps succeed.
+*/
 static int aci_have_lib_function_cxx (const char *includes, const char *cflags,
                                       const char *func, const char *libnames)
 {
@@ -1602,9 +1619,10 @@ static int aci_have_lib_function_cxx (const char *includes, const char *cflags,
 }
 
 
-// Check for compilation and linking success with the given included files,
-// compilation flags and libraries. Return nonzero if the compilation and
-// linking steps succeed. Func is a member function like Foo::bar;
+/* Check for compilation and linking success with the given included files,
+   compilation flags and libraries. Return nonzero if the compilation and
+   linking steps succeed. Func is a member function like Foo::bar;
+*/
 static int aci_have_lib_member (const char *includes, const char *cflags,
                                 const char *func, const char *libnames,
                                 int verbatim)
@@ -1642,9 +1660,10 @@ static int aci_have_lib_member (const char *includes, const char *cflags,
 
 
 
-// Add the libraries listed in libs to the EXTRALIBS variable of the
-// makefile. If using DOS-style libraries then it also adds the pragma
-// comment(name-of-lib) to the headers.
+/* Add the libraries listed in libs to the EXTRALIBS variable of the
+   makefile. If using DOS-style libraries then it also adds the pragma
+   comment(name-of-lib) to the headers.
+*/
 static void aci_add_libs_to_makevars (const char *libs)
 {
 	const char *eow, *sow;
@@ -1715,11 +1734,12 @@ static void aci_add_libs_to_makevars (const char *libs)
 
 
 
-// Check if we can compile and link using the function func, while including
-// the files includes, using the compilation flags cflags and linking with
-// libs. If successful add the tag to the configuration file. "libs" is
-// interpreted as the names of the libraries. The function completes them to
-// turn something like foo into -lfoo or foo.lib as required.
+/* Check if we can compile and link using the function func, while including
+   the files includes, using the compilation flags cflags and linking with
+   libs. If successful add the tag to the configuration file. "libs" is
+   interpreted as the names of the libraries. The function completes them to
+   turn something like foo into -lfoo or foo.lib as required.
+*/
 int ac_has_func_lib_tag (const char *includes, const char *cflags,
                          const char *func, const char *libs,
                          int verbatim, const char *tag)
@@ -1741,6 +1761,7 @@ int ac_has_func_lib_tag (const char *includes, const char *cflags,
 		}
 	}
 
+	printf ("%s: ", sbufchars (&sb));
 	result = aci_have_lib_function (includes, cflags, func, libs, verbatim);
 	aci_flag_list_add (&aci_flags_root, tag, sbufchars (&sb), result);
 	if (result) {
@@ -1748,7 +1769,7 @@ int ac_has_func_lib_tag (const char *includes, const char *cflags,
 		aci_add_cflags_to_makevars (cflags);
 	}
 
-	printf ("%s: %s\n", sbufchars (&sb), aci_noyes[result]);
+	printf ("%s\n", aci_noyes[result]);
 	fflush (stdout);
 
 	sbuffree (&sb);
@@ -1862,9 +1883,10 @@ int ac_has_member_lib (const char *includes, const char *cflags,
 
 
 
-// Check if after including the files listed in "includes" and using the
-// compilation flags "cflags" the structure "sname" has a field called
-// "fname". Return nonzero if the field exists.
+/* Check if after including the files listed in "includes" and using the
+   compilation flags "cflags" the structure "sname" has a field called
+   "fname". Return nonzero if the field exists.
+*/
 static int aci_have_field (const char *includes, const char *cflags,
             const char *sname, const char *fname)
 {
@@ -1886,8 +1908,9 @@ static int aci_have_field (const char *includes, const char *cflags,
 }
 
 
-// If the given structure exits and has the field fname define the label to
-// 1. Otherwise undefine it.
+/* If the given structure exits and has the field fname define the label to
+   1. Otherwise undefine it.
+*/
 int ac_has_member_tag (const char *includes, const char *cflags,
         const char *sname, const char *fname, const char *tag)
 {
@@ -1914,7 +1937,7 @@ int ac_has_member_tag (const char *includes, const char *cflags,
 }
 
 
-// Same as above but the tag is deduced from the name of the field.
+/* Same as above but the tag is deduced from the name of the field. */
 int ac_has_member (const char *includes, const char *cflags,
         const char *sname, const char *fname)
 {
@@ -1934,9 +1957,10 @@ int ac_has_member (const char *includes, const char *cflags,
 }
 
 
-// Check if "tdname" is available as the name of a type after including the
-// files listed in "includes" and compiling with the compilation flags
-// "cflags".
+/* Check if "tdname" is available as the name of a type after including the
+   files listed in "includes" and compiling with the compilation flags
+   "cflags".
+*/
 static int aci_have_typedef (const char *includes, const char *cflags,
                 const char *tdname)
 {
@@ -1957,10 +1981,11 @@ static int aci_have_typedef (const char *includes, const char *cflags,
 
 
 
-// Check if "tname" is available as the name of a type after including the
-// files listed in "includes" and compiling with the compilation flags
-// "cflags". If "tname" is available then define tag in the configuration
-// file.
+/* Check if "tname" is available as the name of a type after including the
+   files listed in "includes" and compiling with the compilation flags
+   "cflags". If "tname" is available then define tag in the configuration
+   file.
+*/
 int ac_has_type_tag (const char *includes, const char *cflags,
         const char *tname, const char *tag)
 {
@@ -1987,7 +2012,7 @@ int ac_has_type_tag (const char *includes, const char *cflags,
 }
 
 
-// Same as above but the tag is deduced from the name of the type.
+/* Same as above but the tag is deduced from the name of the type. */
 int ac_has_type (const char *includes, const char *cflags, const char *tname)
 {
 	char tag[BUFSIZE];
@@ -1998,9 +2023,10 @@ int ac_has_type (const char *includes, const char *cflags, const char *tname)
 }
 
 
-// Check if we can compile the source code in "src", using the compilation
-// flags in "cflags". The comment "comment" will be put in the configuration
-// file before the definition of the tag "tag".
+/* Check if we can compile the source code in "src", using the compilation
+   flags in "cflags". The comment "comment" will be put in the configuration
+   file before the definition of the tag "tag".
+*/
 int ac_does_compile (const char *comment, const char *src,
                      const char *cflags, const char *tag)
 {
@@ -2019,10 +2045,11 @@ int ac_does_compile (const char *comment, const char *src,
 }
 
 
-// Check if we can compile and link the source code in "src", using the
-// compilation flags in "cflags" and linking with the libraries in libs. The
-// comment "comment" will be put in the configuration file before the
-// definition of the tag "tag".
+/* Check if we can compile and link the source code in "src", using the
+   compilation flags in "cflags" and linking with the libraries in libs. The
+   comment "comment" will be put in the configuration file before the
+   definition of the tag "tag".
+*/
 int ac_does_compile_and_link (const char *comment, const char *src,
             const char *flags, const char *libs, const char *tag)
 {
@@ -2041,10 +2068,9 @@ int ac_does_compile_and_link (const char *comment, const char *src,
 }
 
 
-// Same as ac_does_compile, but define the tag only if the compilation
-// fails.
+/* Same as ac_does_compile, but define the tag only if the compilation fails. */
 int ac_does_compile_fail (const char *comment, const char *src,
-            const char *cflags, const char *tag)
+                          const char *cflags, const char *tag)
 {
 	int result;
 
@@ -2061,8 +2087,8 @@ int ac_does_compile_fail (const char *comment, const char *src,
 }
 
 
-// Same as ac_does_compile_and_link, buf define the tag only if the compilation and
-// linking fails.
+/* Same as ac_does_compile_and_link, buf define the tag only if the compilation and
+   linking fails. */
 int ac_does_compile_and_link_fail (const char *comment, const char *src,
             const char *flags, const char *libs, const char *tag)
 {
@@ -2082,7 +2108,7 @@ int ac_does_compile_and_link_fail (const char *comment, const char *src,
 
 
 
-// Check if the file "name" is available in the compilation environment.
+/* Check if the file "name" is available in the compilation environment. */
 int ac_has_file (const char *name)
 {
 	FILE *f = fopen (name, "rb");
@@ -2095,12 +2121,12 @@ int ac_has_file (const char *name)
 
 
 
-// Detects the size of a type without actually running the output (may be
-// useful for cross compilers. It will include the files listed in
-// "includes" and it will use the compilation flags "cflags". If show is
-// true a macro of the form SIZEOF_##tname will be defined in the
-// configuration file. The function returns -1 on failure or the
-// sizeof(tname).
+/* Detects the size of a type without actually running the output (may be
+   useful for cross compilers. It will include the files listed in
+   "includes" and it will use the compilation flags "cflags". If show is
+   true a macro of the form SIZEOF_##tname will be defined in the
+   configuration file. The function returns -1 on failure or the
+   sizeof(tname). */
 int aci_check_sizeof (const char *includes, const char *cflags,
                 const char *tname, int show)
 {
@@ -2153,8 +2179,8 @@ int aci_check_sizeof (const char *includes, const char *cflags,
 }
 
 
-// Public version of above. It will always put the result of the check in
-// the configuration file.
+/* Public version of above. It will always put the result of the check in
+   the configuration file. */
 int ac_get_sizeof (const char *includes, const char *cflags, const char *tname)
 {
 	return aci_check_sizeof (includes, cflags, tname, 1);
@@ -2163,9 +2189,9 @@ int ac_get_sizeof (const char *includes, const char *cflags, const char *tname)
 
 
 
-// Return true if "defname" has been defined as a macro after including the
-// files listed in "includes" and compiling with the compilation flags
-// "cflags".
+/* Return true if "defname" has been defined as a macro after including the
+   files listed in "includes" and compiling with the compilation flags
+   "cflags". */
 int aci_check_define (const char *includes, const char *cflags,
                       const char *defname)
 {
@@ -2188,7 +2214,7 @@ int aci_check_define (const char *includes, const char *cflags,
 }
 
 
-// Same as above buf informing the user about the check.
+/* Same as above buf informing the user about the check. */
 int ac_has_define (const char *includes, const char *cflags,
                    const char *defname)
 {
@@ -2202,9 +2228,9 @@ int ac_has_define (const char *includes, const char *cflags,
 
 
 
-// Check if the expression "expr" is a valid preprocessor expression after
-// including the files listed in "includes" and compiling with the
-// compilation flags "cflags".
+/* Check if the expression "expr" is a valid preprocessor expression after
+   including the files listed in "includes" and compiling with the
+   compilation flags "cflags". */
 int ac_valid_cpp_expression (const char *includes, const char *cflags,
                              const char *expr)
 {
@@ -2225,9 +2251,9 @@ int ac_valid_cpp_expression (const char *includes, const char *cflags,
 
 
 
-// Provide a suitable definition for inline even in C. Within the source you
-// just use inline and if inlining is somehow available it will just be
-// used. Otherwise it will be defined as empty.
+/* Provide a suitable definition for inline even in C. Within the source you
+   just use inline and if inlining is somehow available it will just be
+   used. Otherwise it will be defined as empty. */
 static void aci_check_inline_keyword (void)
 {
 	const char *kw;
@@ -2262,7 +2288,7 @@ static void aci_check_inline_keyword (void)
 }
 
 
-// Provide the restrict keyword.
+/* Provide the restrict keyword. */
 static void aci_check_restrict_keyword (void)
 {
 	if (aci_can_compile ("void func(int * __restrict kk);\n", NULL)) {
@@ -2290,7 +2316,7 @@ static void aci_check_restrict_keyword (void)
 }
 
 
-// Check if the C99 flexible array member feature is available.
+/* Check if the C99 flexible array member feature is available. */
 static void aci_check_flexible_array_member (void)
 {
 	sbuf_t s;
@@ -2316,7 +2342,7 @@ static void aci_check_flexible_array_member (void)
 }
 
 
-// Check if we can put variable declarations mixed with statements as in C99.
+/* Check if we can put variable declarations mixed with statements as in C99. */
 static void aci_check_mixed_code_vars (void)
 {
 	int res;
@@ -2354,7 +2380,7 @@ static sbuf_t stdint_proxy;
 
 
 
-// Helper to detect the number of value bits of the integer type "name".
+/* Helper to detect the number of value bits of the integer type "name". */
 static int aci_get_unsigned_type_bits (const char *name)
 {
 	int i;
@@ -2375,9 +2401,10 @@ static int aci_get_unsigned_type_bits (const char *name)
 }
 
 
-// Provide workarounds for the lack of long long and stdint.h If stdint.h is
-// available it will be included. If not the types
-// [u]int_[least|fast][16,32,64]_t will be defined.
+/* Provide workarounds for the lack of long long and stdint.h If stdint.h is
+   available it will be included. If not the types
+   [u]int_[least|fast][16,32,64]_t will be defined.
+*/
 static void aci_check_stdint (void)
 {
 	int has_long_long = 1;
@@ -2781,7 +2808,7 @@ static void aci_check_stdint (void)
 
 
 
-// Provide format macros.
+/* Provide format macros. */
 static void aci_check_some_inttypes (void)
 {
 	if (aci_has_includes ("inttypes.h", NULL)) {
@@ -2813,8 +2840,9 @@ static void aci_check_some_inttypes (void)
 
 
 
-// Find the block of bytes "block" of size "block_size" within the buffer
-// "buffer" of size "buffer_size". If found return non-zero.
+/* Find the block of bytes "block" of size "block_size" within the buffer
+   "buffer" of size "buffer_size". If found return non-zero.
+*/
 static int aci_find_block (const unsigned char *buffer, size_t buffer_size,
                            const unsigned char *block, size_t block_size)
 {
@@ -2839,11 +2867,11 @@ static int aci_find_block (const unsigned char *buffer, size_t buffer_size,
 
 
 
-// This will define WORDS_BIGENDIAN or WORDS_LITTLEENDIAN if CHAR_BIT is 8
-// and the generated code uses either big endian or little endian. If
-// CHAR_BIT is not 8 or the endianness is mixed neither symbol will be
-// defined.
-
+/* This will define WORDS_BIGENDIAN or WORDS_LITTLEENDIAN if CHAR_BIT is 8
+   and the generated code uses either big endian or little endian. If
+   CHAR_BIT is not 8 or the endianness is mixed neither symbol will be
+   defined.
+*/
 static void aci_check_endian_cross (const char *objext)
 {
 	sbuf_t sb;
@@ -2911,24 +2939,24 @@ static int aci_need_cxx_check = 0;
 static void aci_check_cxx (void);
 
 
-// Are we running under Woe.
-static void aci_check_woe32 (void)
+/* Are we running under Windows. */
+static void aci_check_windows (void)
 {
 	/* We check explicitely for Win32, instead of using _WIN32. Cygwin
 	does not define _WIN32, although Win32 is available. */
 
-	aci_have_woe32 = aci_have_function_proto ("windows.h", NULL, "GetWindowsDirectory");
+	aci_have_windows = aci_have_function_proto ("windows.h", NULL, "GetWindowsDirectory");
 }
 
 
-// Are we running under Woe.
-int ac_has_woe32 (void)
+/* Are we running under Windows. */
+int ac_has_windows (void)
 {
-	return aci_have_woe32;
+	return aci_have_windows;
 }
 
 
-// Check for variants of inline assembly, backtrace and return address.
+/* Check for variants of inline assembly, backtrace and return address. */
 static void check_inline_assembly (void)
 {
 	int have_retaddr = 1;
@@ -2945,7 +2973,7 @@ static void check_inline_assembly (void)
 	ac_does_compile ("Has register pseudovariables and __emit__",
 	    "unsigned int foo(void) {\n"
 		"    unsigned int lo, hi;\n"
-		"   __emit__(0x0f, 0x31);   // rdtsc\n"
+		"   __emit__(0x0f, 0x31);   /* rdtsc */\n"
 		"   lo = _EAX;\n"
 		"   hi = _EDX;\n"
 		"   return (hi + lo);\n}\n", NULL,
@@ -3066,7 +3094,7 @@ static void aci_check_variadic_macros (void)
 }
 
 
-// Check for variants of shell commands to manipulate files.
+/* Check for variants of shell commands to manipulate files. */
 static void aci_check_commands (void)
 {
 	const char *cp = "cp";
@@ -3078,7 +3106,7 @@ static void aci_check_commands (void)
 	FILE *f;
 	sbuf_t sb;
 
-	if (aci_have_woe32) {
+	if (aci_have_windows) {
 		if (aci_run_silent ("cp --help") != 0) {
 			cp = "copy";
 			cpr = "xcopy /s";
@@ -3468,8 +3496,9 @@ void aci_check_att_format (void)
 
 
 
-// See if the compiler supports the compilation flag "flag". If it does set
-// the makefile variable "makevar" to "flag".
+/* See if the compiler supports the compilation flag "flag". If it does set
+   the makefile variable "makevar" to "flag".
+*/
 int ac_has_compiler_flag (const char *flag, const char *makevar)
 {
 	printf ("Does the compiler accept the option %s ", flag);
@@ -3486,7 +3515,7 @@ int ac_has_compiler_flag (const char *flag, const char *makevar)
 }
 
 
-// Check for the presence of ssize_t and typedef it otherwise.
+/* Check for the presence of ssize_t and typedef it otherwise. */
 static void aci_check_ssize (void)
 {
 	if (aci_can_compile ("#include <unistd.h>\nssize_t x;\n", "")) {
@@ -3511,7 +3540,7 @@ static void aci_check_ssize (void)
 }
 
 
-// Check for the unicode types char16_t and char32_t.
+/* Check for the unicode types char16_t and char32_t. */
 static void aci_check_char32 (void)
 {
 	sbuf_t sb;
@@ -3519,8 +3548,9 @@ static void aci_check_char32 (void)
 	ac_has_type_tag ("uchar.h", NULL, "char32_t", "CHAR32_T_IN_UCHAR_H");
 	ac_has_headers ("cuchar", NULL);
 
-	// Ensure that wchar_t is always distinct from char16_t and char32_t.
-	// This is what the C++11 standard says.
+	/* Ensure that wchar_t is always distinct from char16_t and char32_t.
+	   This is what the C++11 standard says.
+	*/
 
 	sbufinit (&sb);
 	sbufcpy (&sb,
@@ -3655,7 +3685,7 @@ static void aci_check_c11_atomics (void)
 }
 
 
-// Check for a bunch of features in one go.
+/* Check for a bunch of features in one go. */
 static void aci_check_misc_once (void)
 {
 	int has_func_name, has_att;
@@ -3680,13 +3710,13 @@ static void aci_check_misc_once (void)
 	}
 	aci_check_ssize ();
 	aci_check_char32 ();
-// Not mature enough, yet.
-// aci_check_c11_atomics ();
+/* Not mature enough, yet. */
+/* aci_check_c11_atomics (); */
 	aci_check_builtin_overflow();
 
-	aci_flag_list_add (&aci_flags_root, "WOE32", "Are we running MS-Windows", aci_have_woe32);
+	aci_flag_list_add (&aci_flags_root, "WINDOWS", "Are we running MS-Windows", aci_have_windows);
 
-	if (aci_have_woe32) {
+	if (aci_have_windows) {
 		if (aci_have_function_proto ("sys/cygwin.h", NULL, "cygwin_conv_to_win32_path")) {
 			aci_flag_list_add (&aci_flags_root, "CYGWIN", "Are we running under Cygwin", 1);
 			aci_have_cygwin = 1;
@@ -3701,7 +3731,7 @@ static void aci_check_misc_once (void)
 
 
 
-	if (aci_have_woe32) {
+	if (aci_have_windows) {
 		ac_set_var ("EXE", ".exe");
 		if (!has_att) {
 			aci_attsyn[0] = "__declspec(%s)";
@@ -3713,7 +3743,7 @@ static void aci_check_misc_once (void)
 
 
 	if (!has_att) {
-		if (aci_have_woe32) {
+		if (aci_have_windows) {
 			ac_add_code ("#define __attribute__(x) __declspec x\n", 1);
 		} else {
 			ac_add_code ("#define __attribute__(x)\n", 1);
@@ -3721,7 +3751,7 @@ static void aci_check_misc_once (void)
 	}
 
 	if (has_att) {
-		if (aci_have_woe32) {
+		if (aci_have_windows) {
 			ac_has_func_attribute ("dllexport", "EXPORT", 1, 0, att_both);
 			ac_has_var_attribute ("dllimport", "IMPORT", att_both);
 		} else if (ac_has_func_attribute ("__visibility__(\"default\")", "EXPORT", 1, 1, att_both)) {
@@ -3752,7 +3782,7 @@ static void aci_check_misc_once (void)
 	sbufformat (&sb, 1, "#define EXPORTFN %s%sEXPORT", aci_macro_prefix, aci_attrib_pfx);
 	ac_add_code (sbufchars (&sb), 1);
 
-	if (aci_have_woe32) {
+	if (aci_have_windows) {
 		sbufformat (&sb, 1, "#define %s%sHIDDEN", aci_macro_prefix,
 		        aci_attrib_pfx);
 		ac_add_code (sbufchars (&sb), 1);
@@ -3849,9 +3879,10 @@ static void aci_check_misc_once (void)
 
 
 
-// Include the files listed in "includes" and compile with the compilation
-// flags "cflags". Are the typedefed types "t1" and "t2" the same types in
-// C++? If yes then define "tag" in the configuration file.
+/* Include the files listed in "includes" and compile with the compilation
+   flags "cflags". Are the typedefed types "t1" and "t2" the same types in
+   C++? If yes then define "tag" in the configuration file.
+*/
 void ac_check_same_cxx_types (const char *includes, const char *cflags,
         const char *t1, const char *t2, const char *tag)
 {
@@ -3878,7 +3909,7 @@ void ac_check_same_cxx_types (const char *includes, const char *cflags,
 }
 
 
-// Do we have a working SFINAE?
+/* Do we have a working SFINAE? */
 static void aci_check_sfinae (void)
 {
 	/* Example taken from Alexandrescu's Modern C++ design. */
@@ -3898,7 +3929,7 @@ static void aci_check_sfinae (void)
 }
 
 
-// Is std::numeric_limits<> specialized for int64_t and uint64_t?
+/* Is std::numeric_limits<> specialized for int64_t and uint64_t? */
 static void aci_specialize_numeric_limits (void)
 {
 	static const char src1[] =
@@ -3984,9 +4015,10 @@ static void aci_specialize_numeric_limits (void)
 
 
 
-// The standard specifies the two phase lookup for dependent base names. It
-// may be necessary to qualify the names, but at least BCC32 does not allow
-// using the correct syntax.
+/* The standard specifies the two phase lookup for dependent base names. It
+   may be necessary to qualify the names, but at least BCC32 does not allow
+   using the correct syntax.
+*/
 
 static void aci_check_buggy_using (void)
 {
@@ -4012,9 +4044,10 @@ static void aci_check_strong_using (void)
 
 	sbufformat (&sb, 1, "#define %sCXX_INLINE_NAMESPACE(N) ", aci_macro_prefix);
 
-	// Note: clang++ 3.1 chokes when reopening an inline namespace without
-	// the inline keyword. The C++11 standard says the inline keyword is
-	// optional when reopening the inline namespace (C++11, 7.3.1, par. 7)
+	/* Note: clang++ 3.1 chokes when reopening an inline namespace without
+	   the inline keyword. The C++11 standard says the inline keyword is
+	   optional when reopening the inline namespace (C++11, 7.3.1, par. 7)
+	*/
 
 	if (ac_does_compile ("Has C++11 inline namespace",
 	        "namespace enclosing {\n"
@@ -4083,7 +4116,7 @@ static void aci_check_decltype (void)
 	aci_flag_list_add (&aci_flags_root, "DECLTYPE_MACRO", "Can use decltype",
 	                  has_dt || has_gcc_typeof);
 
-	// Define the macro name from N3694.
+	/* Define the macro name from N3694. */
 	ac_add_code ("#if defined(HAVE_DECLTYPE_MACRO) && !defined(__cpp_decltype)\n"
 			 "  #define __cpp_decltype 200707\n"
 			 "#endif\n", 1);
@@ -4125,7 +4158,7 @@ static void aci_check_abi_tag (void)
 }
 
 
-// Check if we can use 64-bit arithmetic as template parameters.
+/* Check if we can use 64-bit arithmetic as template parameters. */
 static void aci_check_intmax_template_param (void)
 {
 	if (aci_have_int64) {
@@ -4144,7 +4177,7 @@ static void aci_check_intmax_template_param (void)
 }
 
 
-// Check for C++11 explicit extern template instantiation control.
+/* Check for C++11 explicit extern template instantiation control. */
 static void aci_check_extern_templ_inst (void)
 {
 	ac_does_compile ("Has C++11 extern template explicit instantiation",
@@ -4159,7 +4192,7 @@ static void aci_check_rvalue_refs (void)
 	ac_does_compile ("Has C++11 rvalue references",
 	        "void foo(int &&);\n", NULL, "CXX_RVALUE_REFS");
 
-	// Define the macro name from N3694.
+	/* Define the macro name from N3694. */
 	ac_add_code ("#if defined(HAVE_CXX_RVALUE_REFS) && !defined(__cpp_rvalue_reference)\n"
 			 "  #define __cpp_rvalue_reference 200610\n"
 			 "#endif\n", 1);
@@ -4218,7 +4251,7 @@ static void aci_check_constexpr (void)
 }
 
 
-// Perform all C++ specific checks.
+/* Perform all C++ specific checks. */
 static void aci_check_cxx (void)
 {
 	aci_check_sfinae ();                /* Required to support enable_if */
@@ -4236,15 +4269,16 @@ static void aci_check_cxx (void)
 	aci_check_constexpr();
 	aci_check_auto();
 	aci_check_abi_tag();
-//  ac_check_each_header_sequence("type_traits chrono tuple system_error ratio atomic thread", "");
+/*  ac_check_each_header_sequence("type_traits chrono tuple system_error ratio atomic thread", ""); */
 }
 
 
 
-// Add func_name.o to the list of object files that must be compiled. This
-// list is available as the value of the makefile variable LIBOBJS. It will
-// usually be the list of files which provide replacements for missing
-// functions.
+/* Add func_name.o to the list of object files that must be compiled. This
+   list is available as the value of the makefile variable LIBOBJS. It will
+   usually be the list of files which provide replacements for missing
+   functions.
+*/
 void ac_libobj (const char *func_name)
 {
 	sbuf_t sb;
@@ -4259,10 +4293,11 @@ void ac_libobj (const char *func_name)
 
 
 
-// After including the files listed in "includes" and compiling with the
-// compilation flags "cflags" check for the presence of each of the
-// functions listed in "funcs". If the function is not available the add the
-// object file "function_name.o" to the makefile variable LIBOBJS.
+/* After including the files listed in "includes" and compiling with the
+   compilation flags "cflags" check for the presence of each of the
+   functions listed in "funcs". If the function is not available the add the
+   object file "function_name.o" to the makefile variable LIBOBJS.
+*/
 void ac_replace_funcs (const char *includes, const char *cflags, const char *funcs)
 {
 	const char *sow = funcs;
@@ -4289,8 +4324,9 @@ void ac_replace_funcs (const char *includes, const char *cflags, const char *fun
 }
 
 
-// Check for the presence of each function in "funcs". Use it after
-// ac_check_each_header_sequence().
+/* Check for the presence of each function in "funcs". Use it after
+   ac_check_each_header_sequence().
+*/
 void ac_check_each_func (const char *funcs, const char *cflags)
 {
 	const char *sow = funcs;
@@ -4334,8 +4370,7 @@ void ac_check_each_func (const char *funcs, const char *cflags)
 
 
 
-// See if the boolean option "opt" has been given and remove it from argc,
-// argv.
+/* See if the boolean option "opt" has been given and remove it from argc, argv. */
 static int aci_has_option (int *argc, char **argv, const char *opt)
 {
 	int i;
@@ -4359,8 +4394,9 @@ static int aci_has_option (int *argc, char **argv, const char *opt)
 }
 
 
-// See if the option "opt" with an argument has been given. Remove it form
-// argc, argv and return the argument.
+/* See if the option "opt" with an argument has been given. Remove it form
+   argc, argv and return the argument.
+*/
 static const char * aci_has_optval (int *argc, char **argv, const char *opt)
 {
 	int i;
@@ -4425,7 +4461,7 @@ void ac_show_help (void)
 
 
 
-// Add the description of one option.
+/* Add the description of one option. */
 void ac_add_option_info (const char *opt, const char *desc)
 {
 	sbuf_t sb;
@@ -4446,8 +4482,7 @@ void ac_add_option_info (const char *opt, const char *desc)
 }
 
 
-// Add the options passed in the command line to the makefile features
-// variables.
+/* Add the options passed in the command line to the makefile features variables. */
 void aci_add_cmd_vars(int argc, char **argv)
 {
 	int i;
@@ -4484,7 +4519,7 @@ void aci_add_cmd_vars(int argc, char **argv)
 }
 
 
-// Check if the option "name" was given and put its value in dest.
+/* Check if the option "name" was given and put its value in dest. */
 int ac_has_feature (const char *name, char *dest, size_t dest_size)
 {
 	aci_varnode_t *vn;
@@ -4528,7 +4563,7 @@ int ac_has_feature (const char *name, char *dest, size_t dest_size)
 }
 
 
-// We are finished. Clean up the temporary files.
+/* We are finished. Clean up the temporary files. */
 static void aci_cleanup (void)
 {
 	sbuf_t sb;
@@ -4584,7 +4619,7 @@ void aci_usage (const char *progname)
 	printf ("--%s will check for GCC's -std=gnu99 or gnu++11 (gnu++0x) options\n", aci_stdver);
 	printf ("--%s will select the default version of the language as provided by the compiler\n", aci_nostdver);
 	printf ("--%s will choose simple command line options for GCC which are not likely to be buggy\n", aci_simple_name);
-	printf ("--%s will use static linking when probing.\n", aci_static_name); 
+	printf ("--%s will use static linking when probing.\n", aci_static_name);
 	printf ("--prefix=name will use the given prefix for the generation of INSTALL_INCLUDE and INSTALL_LIB make variables\n");
 	printf ("--with-extra-includes <name> will use the given additional include directories\n");
 	printf ("--with-extra-libs <name> will use the given additional library directories\n");
@@ -4648,7 +4683,7 @@ static int aci_get_make_var (const char *varname, char *s, size_t n)
 }
 
 
-// Check if the include form "form" actually works.
+/* Check if the include form "form" actually works. */
 static int aci_has_include_form (const char *form)
 {
 	static const char dummy_inc[] = "__dummy.inc";
@@ -4682,7 +4717,7 @@ static int aci_has_include_form (const char *form)
 }
 
 
-// Find out how to include files within the makefile.
+/* Find out how to include files within the makefile. */
 static const char * aci_get_include_form (void)
 {
 	static const char *variants[] = {
@@ -4728,7 +4763,7 @@ static int aci_try_alldeps (const char *s)
 }
 
 
-// Figure out how the makefile denotes all the dependencies of a target.
+/* Figure out how the makefile denotes all the dependencies of a target. */
 static int aci_get_alldeps (char *alldeps)
 {
 	FILE *fw;
@@ -4786,7 +4821,7 @@ static int aci_try_wall (const char *cc, const char *src, const char *proposed)
 }
 
 
-// Figure out how to enable all warnings in the compiler.
+/* Figure out how to enable all warnings in the compiler. */
 static int aci_get_wall (const char *cc, char *wall)
 {
 	int rc = 0;
@@ -4822,7 +4857,7 @@ static int aci_get_wall (const char *cc, char *wall)
 
 
 
-// Get the name of the compiler from the environment.
+/* Get the name of the compiler from the environment. */
 static int aci_find_compiler_name (char *s, size_t n, int prefer_cxx)
 {
 	if (prefer_cxx && aci_get_make_var ("CXX", s, n) == 0) {
@@ -4835,7 +4870,7 @@ static int aci_find_compiler_name (char *s, size_t n, int prefer_cxx)
 }
 
 
-// Does this compiler use DOS conventions.
+/* Does this compiler use DOS conventions. */
 static int aci_is_dos_compiler (void)
 {
 	static const char src[] = "__dummy.c";
@@ -4863,11 +4898,11 @@ static int aci_is_dos_compiler (void)
 }
 
 
-// How do we specify the name of the output file of the compiler?
+/* How do we specify the name of the output file of the compiler? */
 static void aci_find_exe_out (void)
 {
 	static const char src[] = "__dummy.c";
-	static const char exe_dos[] = "__kkk.exe";  /* Valid name for Woe and UNIX. */
+	static const char exe_dos[] = "__kkk.exe";  /* Valid name for Windows and UNIX. */
 	FILE *f;
 	char cmd[FILENAME_MAX];
 
@@ -4896,7 +4931,7 @@ static void aci_find_exe_out (void)
 			}
 		}
 	}
-	remove (src);  
+	remove (src);
 	remove (exe_dos);
 }
 
@@ -4913,7 +4948,7 @@ void ac_use_macro_prefix (const char *pfx)
 }
 
 
-// See if the makevars file specified the TARGET_ARCH.
+/* See if the makevars file specified the TARGET_ARCH. */
 static void aci_check_targetarch_in_makevars (void)
 {
 	 char s[1000];
@@ -4952,12 +4987,12 @@ static void aci_check_targetarch_in_makevars (void)
 }
 
 
-// See if there is a site makevars file.
+/* See if there is a site makevars file. */
 static void aci_check_makevars (void)
 {
 	FILE *f;
 
-	ac_set_var ("LIBBIN", aci_have_woe32 ? "bin" : "lib");
+	ac_set_var ("LIBBIN", aci_have_windows ? "bin" : "lib");
 
 	if (*aci_makevars_file) {
 		aci_check_targetarch_in_makevars ();
@@ -4997,8 +5032,8 @@ static void aci_check_makevars (void)
 
 
 
-// Try to locate where the compiler has been hidden.
-static int aci_locate_woe_compiler(const char *cmd, char *fullpath, size_t n)
+/* Try to locate where the compiler has been hidden. */
+static int aci_locate_windows_compiler(const char *cmd, char *fullpath, size_t n)
 {
 	sbuf_t sb;
 	const char *sow, *eow, *cmdeow;
@@ -5091,10 +5126,11 @@ done:
 
 
 
-// Figure out which prefix to use. The user may specify it in the command
-// line. If we are non running windows we assume it is /usr/local. Otherwise
-// it will be the directory where the compiler is located, with /local added
-// to it.
+/* Figure out which prefix to use. The user may specify it in the command
+   line. If we are not running windows we assume it is /usr/local. Otherwise
+   it will be the directory where the compiler is located, with /local added
+   to it.
+*/
 static void aci_get_prefix(void)
 {
 	char pfx[FILENAME_MAX];
@@ -5107,8 +5143,8 @@ static void aci_get_prefix(void)
 		}
 		ac_set_var ("PREFIX", pfx);
 		strcpy (aci_install_prefix, pfx);
-	} else if (aci_have_woe32 && !aci_have_cygwin) {
-		if (aci_locate_woe_compiler (aci_compile_cmd, pfx, sizeof pfx) == 0) {
+	} else if (aci_have_windows && !aci_have_cygwin) {
+		if (aci_locate_windows_compiler (aci_compile_cmd, pfx, sizeof pfx) == 0) {
 			strcat (pfx, "local/");
 			ac_set_var ("PREFIX", pfx);
 			strcpy (aci_install_prefix, pfx);
@@ -5126,7 +5162,7 @@ static void aci_get_prefix(void)
 }
 
 
-// Check for the availability of different GCC flags.
+/* Check for the availability of different GCC flags. */
 static void aci_check_gcc_flags (int prefer_cxx)
 {
 	sbufcat (&aci_testing_flags, " -Werror");
@@ -5146,14 +5182,14 @@ static void aci_check_gcc_flags (int prefer_cxx)
 	   See http://d-sbd.alioth.debian.org/www/?page=pax_pie
 	 */
 	ac_has_compiler_flag ("-fpie", "GCC_FPIE");
-	if (aci_have_woe32) {
+	if (aci_have_windows) {
 		ac_has_compiler_flag ("-Wl,--dynamicbase,--nxcompat", "GCC_PIE");
 	} else {
 		ac_has_compiler_flag ("-pie", "GCC_PIE");
 	}
 
-	// It seems that from GCC5 onwards the option -fextended-identifiers is
-	// enabled by default.
+	/* It seems that from GCC5 onwards the option -fextended-identifiers is
+	   enabled by default. */
 	ac_has_compiler_flag ("-fextended-identifiers", "GCC_EXTIDENT");
 	if (ac_has_compiler_flag ("-fvisibility=hidden", "GCC_VISHIDDEN")) {
 		 sbufcat (&aci_testing_flags, " -fvisibility=hidden");
@@ -5172,6 +5208,11 @@ static void aci_check_gcc_flags (int prefer_cxx)
 	if (ac_has_compiler_flag ("-Wl,--as-needed", "GCC_ASNEEDED")) {
 		 sbufcat (&aci_testing_flags, " -Wl,--as-needed");
 	}
+	/* Needed if we want to have transitive linking due to inline functions referring
+	   to functions in other libraries. */
+	if (ac_has_compiler_flag ("-Wl,--copy-dt-needed-entries", "GCC_COPY_DT_NEEDED_ENTRIES")) {
+		 sbufcat (&aci_testing_flags, " -Wl,--copy-dt-needed-entries");
+	}
 	if (ac_has_compiler_flag ("-mthreads", "GCC_MTHREADS")) {
 		 sbufcat (&aci_testing_flags, " -mthreads");
 	}
@@ -5187,7 +5228,7 @@ static void aci_check_gcc_flags (int prefer_cxx)
 	ac_has_compiler_flag ("-fsanitize=thread", "GCC_SANITIZE_THREAD");
 
 	/* Does not work in Cygwin yet. */
-	if (!aci_have_woe32) {
+	if (!aci_have_windows) {
 		ac_has_compiler_flag ("-gsplit-dwarf", "GCC_SPLIT_DWARF");
 		ac_has_compiler_flag ("-Wa,--compress-debug-sections", "GCC_COMPRESS_DEBUG_SECTIONS");
 	}
@@ -5205,7 +5246,7 @@ static void aci_check_gcc_flags (int prefer_cxx)
 		ac_set_var ("GCC_SONAME", "-Wl,--soname=$(notdir $@)");
 	}
 
-	if (aci_have_woe32 && ac_has_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB")) {
+	if (aci_have_windows && ac_has_compiler_flag ("-shared -Wl,--out-implib=foo.a", "GCC_OUTIMPLIB")) {
 		ac_set_var ("GCC_OUTIMPLIB", "-Wl,--out-implib=$@$(A)");
 	}
 
@@ -5269,12 +5310,15 @@ static void aci_check_gcc_flags (int prefer_cxx)
 							 "          $(GCC_STD) $(GCC_STATIC) \\\n"
 							 "          $(GCC_TREEVECTORIZE) $(GCC_FASTMATH) $(GCC_POSIX) $(GCC_EXTIDENT)\n");
 		ac_add_var_append ("LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) $(GCC_RPATH_BIN) \\\n"
-						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) $(GCC_POSIX) \\\n");
+						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_COPY_DT_NEEDED_ENTRIES) $(GCC_MTHREADS) \\\n"
+						   "            $(GCC_STD) $(GCC_POSIX) \\\n");
 		ac_add_var_append ("PIE_LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) $(GCC_RPATH_BIN) \\\n"
-						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) $(GCC_POSIX) \\\n"
-						 "            $(GCC_PIE)");
+						   "            $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED)  $(GCC_COPY_DT_NEEDED_ENTRIES) $(GCC_MTHREADS) \\\n"
+						   "            $(GCC_STD) $(GCC_POSIX) \\\n"
+						   "            $(GCC_PIE)");
 		ac_add_var_append ("SO_LDFLAGS", "$(TARGET_ARCH) $(GCC_VISHIDDEN) $(GCC_NEWDTAGS) $(GCC_RPATH_LIB) \\\n"
-							  "         $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_MTHREADS) $(GCC_STD) \\\n"
+							  "         $(GCC_RPATH_PREFIX) $(GCC_ASNEEDED) $(GCC_COPY_DT_NEEDED_ENTRIES) \\\n"
+							  "         $(GCC_MTHREADS) $(GCC_STD) \\\n"
 							  "         $(GCC_G) $(GCC_GDB_INDEX) $(GCC_SONAME) $(GCC_POSIX) -shared");
 
 		ac_add_var_append ("CFLAGS_DEBUG", "$(GCC_G) $(GCC_STACK_PROTECTOR_ALL) $(GCC_COMPRESS_DEBUG_SECTIONS) $(GCC_SPLIT_DWARF) $(GCC_TRAPV) $(GCC_NON_CALL_EXCEPTION)");
@@ -5283,10 +5327,10 @@ static void aci_check_gcc_flags (int prefer_cxx)
 		ac_add_var_append ("LDFLAGS_OPTIMIZE", "$(GCC_O2)");
 	}
 
-	// Signed overflow. We use the same option as Rust: trap on overflow when debugging. Wrap around when optimized.
+	/* Signed overflow: We use the same option as Rust: trap on overflow when debugging. Wrap around when optimized. */
 }
 
-// Check for the availability of Tiny CC flags.
+/* Check for the availability of Tiny CC flags. */
 static void aci_check_tinyc_flags (void)
 {
 	sbufcat (&aci_testing_flags, " -Werror");
@@ -5357,12 +5401,12 @@ static void aci_check_tinyc_flags (void)
 
 	ac_add_var_append ("CFLAGS_DEBUG", "$(GCC_G)");
 	ac_add_var_append ("CFLAGS_OPTIMIZE", "$(GCC_O2) $(GCC_OMITFRAMEPOINTER) -DNDEBUG");
-//    ac_add_var_append ("LDFLAGS_DEBUG", "");
+/*    ac_add_var_append ("LDFLAGS_DEBUG", ""); */
 	ac_add_var_append ("LDFLAGS_OPTIMIZE", "$(GCC_O2)");
 }
 
 
-// Check for the availability of clang flags.
+/* Check for the availability of clang flags. */
 void aci_check_clang_flags (int prefer_cxx)
 {
 	sbufcat (&aci_testing_flags, " -Werror");
@@ -5401,8 +5445,8 @@ void aci_check_clang_flags (int prefer_cxx)
 	ac_has_compiler_flag ("-ffast-math", "GCC_FASTMATH");
 	ac_has_compiler_flag ("-g", "GCC_G");
 	ac_has_compiler_flag ("-fstack-protector", "GCC_STACK_PROTECTOR");
-	// Fails on Woe
-//    ac_has_compiler_flag ("-ftrapv", "GCC_TRAPV");
+	/* Fails on Windows */
+/*    ac_has_compiler_flag ("-ftrapv", "GCC_TRAPV"); */
 	ac_has_compiler_flag ("-fnon-call-exception", "GCC_NON_CALL_EXCEPTION");
 
 	if (ac_has_compiler_flag ("-shared -Wl,--soname=foo", "GCC_SONAME")) {
@@ -5458,7 +5502,7 @@ void aci_check_clang_flags (int prefer_cxx)
 
 
 
-// Start everything.
+/* Start everything. */
 void ac_init (const char *extension, int argc, char **argv, int latest_c_version)
 {
 	int prefer_cxx = 0;
@@ -5543,29 +5587,30 @@ void ac_init (const char *extension, int argc, char **argv, int latest_c_version
 	}
 
 	aci_add_cmd_vars (argc, argv);
-	aci_check_woe32 ();
+	aci_check_windows ();
 	aci_get_prefix ();
 	aci_check_makevars ();
-	aci_check_woe32 ();
 
 	while ((cp = aci_has_optval (&argc, argv, "with-extra-includes")) != NULL) {
 		if (sbuflen (&aci_include_dirs) != 0) {
-			sbufcat (&aci_include_dirs, aci_have_woe32 ? ";" : ":");
+			sbufcat (&aci_include_dirs, aci_have_windows ? ";" : ":");
 		} else {
 			sbufcat (&aci_include_dirs, "-I");
 		}
 		sbufcat (&aci_include_dirs, cp);
 	}
+/*    sbufformat (&aci_include_dirs, 0, " -I%sinclude", aci_install_prefix); */
 	ac_set_var ("EXTRA_INCLUDE_DIRS", sbufchars (&aci_include_dirs));
 
 	while ((cp = aci_has_optval (&argc, argv, "with-extra-libs")) != NULL) {
 		if (sbuflen (&aci_lib_dirs) != 0) {
-			sbufcat (&aci_lib_dirs, aci_have_woe32 ? ";" : ":");
+			sbufcat (&aci_lib_dirs, aci_have_windows ? ";" : ":");
 		} else {
 			sbufcat (&aci_lib_dirs, "-L");
 		}
 		sbufcat (&aci_lib_dirs, cp);
 	}
+/*  sbufformat (&aci_lib_dirs, 0, "-L%slib", aci_install_prefix);   */           
 	ac_set_var ("EXTRA_LIB_DIRS", sbufchars (&aci_lib_dirs));
 
 	while ((cp = aci_has_optval (&argc, argv, "extra-cflags")) != NULL) {
@@ -5712,7 +5757,7 @@ void ac_init (const char *extension, int argc, char **argv, int latest_c_version
 
 	int has_abiname = (aci_varlist_find(&aci_features, "ABINAME") != NULL);
 
-	if (ac_has_woe32()) {
+	if (ac_has_windows()) {
 		ac_set_var ("SO", ".dll");
 		if (has_abiname) {
 			ac_set_var ("SOV", "-$(ABINAME)-$(SOMAJOR).dll");
@@ -5740,8 +5785,9 @@ void ac_init (const char *extension, int argc, char **argv, int latest_c_version
 
 
 
-// Write out the configuration file to "config_name". Prefix the
-// configuration macros with "feature_pfx".
+/* Write out the configuration file to "config_name". Prefix the
+   configuration macros with "feature_pfx".
+*/
 void ac_config_out (const char *config_name, const char *feature_pfx)
 {
 	FILE *f;
@@ -5786,8 +5832,7 @@ void ac_config_out (const char *config_name, const char *feature_pfx)
 }
 
 
-// Write the completed makefile reading it from "make_in" and putting it in
-// "make_out".
+/* Write the completed makefile reading it from "make_in" and putting it in "make_out". */
 void ac_edit_makefile (const char *make_in, const char *make_out)
 {
 	FILE *fr, *fw;
@@ -5817,7 +5862,7 @@ void ac_edit_makefile (const char *make_in, const char *make_out)
 	aci_dump_strlist (&aci_pkg_config_packs, fw, 0);
 	fprintf (fw, "\n");
 
-	if (aci_have_woe32) {
+	if (aci_have_windows) {
 		fprintf (fw, "%%: %%.exe\n\t\n");
 	}
 
@@ -5849,7 +5894,7 @@ void ac_edit_makefile (const char *make_in, const char *make_out)
 }
 
 
-// Write a makefile variable.
+/* Write a makefile variable. */
 static void aci_varnode_dump (const char *name, FILE *f)
 {
 	const aci_varnode_t *vn;
@@ -5869,7 +5914,7 @@ static void aci_varnode_dump (const char *name, FILE *f)
 }
 
 
-// Create a .pc file for pkg-config.
+/* Create a .pc file for pkg-config. */
 void ac_create_pc_file (const char *libname, const char *desc)
 {
 	sbuf_t sb;
@@ -5889,10 +5934,10 @@ void ac_create_pc_file (const char *libname, const char *desc)
 	fprintf (f, "Version: None\n");
 	fprintf (f, "Description: %s\n", desc);
 
-	// Dump Cflags:
+	/* Dump Cflags: */
 	fprintf (f, "Cflags: ");
 	aci_varnode_dump ("EXTRA_CFLAGS", f);
-//  aci_varnode_dump ("GCC_STD", f);
+/* aci_varnode_dump ("GCC_STD", f); */
 	fprintf (f, "\n");
 	if (aci_install_prefix_spaces) {
 		fprintf (f, "Libs: -L\"%slib\" -l%s\n", aci_install_prefix, libname);
@@ -5913,7 +5958,7 @@ void ac_create_pc_file (const char *libname, const char *desc)
 
 
 
-// Finish everything.
+/* Finish everything. */
 void ac_finish (void)
 {
 	sbuffree (&aci_include_dirs);
@@ -5950,7 +5995,7 @@ void ac_finish (void)
 }
 
 
-// See if pkg-config is available.
+/* See if pkg-config is available. */
 int ac_has_pkg_config (void)
 {
 	return aci_run_silent ("pkg-config --help") == 0;
@@ -5960,7 +6005,7 @@ int ac_has_pkg_config (void)
 typedef enum { pkgconf_cflags, pkgconf_libs } pkgconf_flags;
 
 
-// Get the flags as given by pkg-config.
+/* Get the flags as given by pkg-config. */
 int ac_pkg_config_flags (const char *s, char *buf, size_t n, pkgconf_flags what)
 {
 	 sbuf_t sb;
@@ -5975,7 +6020,7 @@ int ac_pkg_config_flags (const char *s, char *buf, size_t n, pkgconf_flags what)
 		  sbufcat (&sb, "--cflags");
 	 } else if (what == pkgconf_libs) {
 		  sbufcat (&sb, "--libs");
-		  if (aci_have_woe32) {
+		  if (aci_have_windows) {
 			   sbufcat (&sb, " --static");
 		  }
 	 }
@@ -5986,7 +6031,7 @@ int ac_pkg_config_flags (const char *s, char *buf, size_t n, pkgconf_flags what)
 	 err = aci_run_silent (sbufchars (&sb));
 
 	 if (err == 0) {
-		  FILE *f = fopen ("__dummys1", "r");
+		  FILE *f = fopen (aci_stdout_dummy, "r");
 		  if (f) {
 			   size_t count = fread (buf, 1, n - 1, f);
 			   if (count > 0 && buf[count - 1] == '\n') {
@@ -6009,8 +6054,9 @@ static int aci_pkg_config_checked = 0;
 
 
 
-// Check for a function. If package config is available its information will
-// be used to deduce the required flags.
+/* Check for a function. If package config is available its information will
+   be used to deduce the required flags.
+*/
 int ac_has_func_pkg_config_tag (const char *includes,
         const char *cflags, const char *func, const char *package,
         const char *tag)
@@ -6032,7 +6078,6 @@ int ac_has_func_pkg_config_tag (const char *includes,
 		sbufcpy (&sb, cflags ? cflags : "");
 		sbufcat (&sb, " ");    sbufcat (&sb, pcflags);
 		res = ac_has_func_lib_tag (includes, sbufchars (&sb), func, libs, 1, tag);
-
 		logfile = fopen ("configure.log", "a");
 		if (logfile) {
 			fprintf (logfile, "\nFound package %s in pkg-config: %d\n", package, res);
@@ -6096,7 +6141,7 @@ int ac_has_member_pkg_config_tag (const char *includes, const char *cflags,
 			aci_strlist_add (&aci_pkg_config_packs, package, 1);
 		}
 		sbuffree (&sb);
-    } else {
+	} else {
 		res = ac_has_member_lib_tag (includes, cflags, func, package, 0, tag);
 #if 0
 		if (res) {
